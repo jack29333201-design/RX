@@ -631,8 +631,12 @@ const ctx = el => {
   const bEl = el.closest('.block'), vEl = el.closest('[data-vendor]'), iEl = el.closest('.item');
   return { blockId: bEl && bEl.dataset.id, vendor: vEl ? vEl.dataset.vendor : undefined, itemId: iEl && iEl.dataset.item };
 };
-$('list').addEventListener('change', e => {
-  const t = e.target, c = ctx(t);
+// LINE 內建瀏覽器有時下拉選單只觸發 input、不觸發 change → 兩個都聽，但同一個值只送一次
+const onListChange = e => {
+  const t = e.target;
+  if (e.type === 'input' && t.tagName !== 'SELECT') return;
+  if (t.tagName === 'SELECT') { if (t.dataset.sent === t.value) return; t.dataset.sent = t.value; }
+  const c = ctx(t);
   if (t.classList.contains('b-date')) return run('updateBlock', { id: c.blockId, date: t.value });
   const patchKey = { qty: 'qty', unit: 'unit', vendor: 'vendor', prog: 'progress', oq: 'orderQty', ou: 'orderUnit', 'note-in': 'note' };
   for (const cls in patchKey) if (t.classList.contains(cls)) {
@@ -641,7 +645,10 @@ $('list').addEventListener('change', e => {
   }
   if (t.classList.contains('slip')) return run('vendorSlip', { blockId: c.blockId, vendor: c.vendor, slip: t.value });
   if (t.classList.contains('slipby')) return run('vendorSlip', { blockId: c.blockId, vendor: c.vendor, slipBy: t.value });
-});
+};
+$('list').addEventListener('change', onListChange);
+$('list').addEventListener('input', onListChange);
+$('list').addEventListener('focusin', e => { if (e.target.tagName === 'SELECT') e.target.dataset.sent = e.target.value; });
 $('list').addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.matches('input.f')) e.target.blur(); });
 $('list').addEventListener('click', e => {
   const t = e.target.closest('button'); if (!t) return;
@@ -798,7 +805,8 @@ async function generate(b) {
   const j = await run('generate', { blockId: b.id });
   if (j && j.shareBlock) openShare(j.shareBlock);
 }
-function appUrl(b) { return location.origin + location.pathname + '?date=' + encodeURIComponent(b.date); }
+// openExternalBrowser=1：從 LINE 點連結會直接用 Safari / Chrome 開，不用 LINE 內建瀏覽器
+function appUrl(b) { return location.origin + location.pathname + '?date=' + encodeURIComponent(b.date) + '&openExternalBrowser=1'; }
 function shareText(b) {
   const lines = [`${String(b.date).slice(5)} 需要調貨`];
   let n = 0;
