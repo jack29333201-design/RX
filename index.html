@@ -231,7 +231,8 @@
   .adding { margin-top: 14px; text-align: center; font-size: 18px; font-weight: 700; color: var(--accent); }
   button:disabled { opacity: .5; }
   /* 手機鍵盤打開時，彈窗貼在鍵盤上方、可往上長高 */
-  .sheet { bottom: var(--kb, 0px) !important; max-height: calc(var(--vvh, 100vh) - 12px) !important; transition: bottom .15s ease-out; }
+  .sheet { bottom: var(--kb, 0px) !important; max-height: calc(var(--vvh, 100vh) - 12px) !important; }
+  #askSheet.open { animation: none; }
   /* 提示文字（placeholder）一律淺灰、細 */
   :root { --ph: #A3ADAA; } :root[data-theme="dark"] { --ph: #6F86A0; }
   .big::placeholder, .f::placeholder, input::placeholder { color: var(--ph) !important; font-weight: 400 !important; opacity: 1; }
@@ -537,7 +538,7 @@
 <script>
 // API_URL 放在 config.js（這樣更新 index.html 時就不用重填）
 
-const APP_VERSION = '2026-10-29.28'; // 每次更新 index.html 會改這個
+const APP_VERSION = '2026-10-29.29'; // 每次更新 index.html 會改這個
 const PROGRESS = ['已訂貨', '已調貨', '缺藥', '其他'];
 const SLIP = ['已key', '缺貨單'];
 const slipName = s => ({ '貨單已key': '已key', '缺貨單需要電子檔': '缺貨單' }[s] || s || ''); // 舊資料換成新名稱
@@ -970,6 +971,7 @@ const onListChange = e => {
   if (t.classList.contains('b-date')) return run('updateBlock', { id: c.blockId, date: t.value });
   const patchKey = { qty: 'qty', unit: 'unit', vendor: 'vendor', prog: 'progress', oq: 'orderQty', ou: 'orderUnit', 'note-in': 'note', 'pnote-in': 'progressNote' };
   if (t.classList.contains('prog') && t.value === '其他') {
+    t.blur(); // 先關掉 iPhone 的選單，再開輸入視窗
     const b = findBlock(c.blockId), it = b && b.items.find(x => x.id === c.itemId);
     const prev = it ? it.progress : '';
     return askText(`「${it ? it.drug : ''}」其他進度`, it && it.progressNote || '', text => {
@@ -1217,7 +1219,7 @@ function askText(title, value, ok, cancel) {
   $('askTitle').textContent = title; $('askInput').value = value || '';
   askCb = { ok, cancel };
   showSheet('askSheet');
-  setTimeout(() => $('askInput').focus(), 60);
+  setTimeout(() => { try { $('askInput').focus({ preventScroll: true }); } catch (e) { $('askInput').focus(); } }, 250);
 }
 function askDone(confirmed) {
   const cb = askCb; askCb = null;
