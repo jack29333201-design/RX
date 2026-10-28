@@ -410,7 +410,7 @@
 <script>
 // API_URL 放在 config.js（這樣更新 index.html 時就不用重填）
 
-const APP_VERSION = '2026-10-29.7'; // 每次更新 index.html 會改這個
+const APP_VERSION = '2026-10-29.8'; // 每次更新 index.html 會改這個
 const PROGRESS = ['已訂貨', '已調貨', '缺藥', '其他'];
 const SLIP = ['已key', '缺貨單'];
 const slipName = s => ({ '貨單已key': '已key', '缺貨單需要電子檔': '缺貨單' }[s] || s || ''); // 舊資料換成新名稱
@@ -865,8 +865,8 @@ async function generate(b) {
 function appUrl(b) { return location.origin + location.pathname + '?date=' + encodeURIComponent(b.date) + '&openExternalBrowser=1'; }
 function shareText(b) {
   const lines = [`${String(b.date).slice(5)} 需要調貨`];
-  let n = 0;
   groups(b).forEach(g => {
+    let n = 0; // 每個廠商重新從 1 開始
     lines.push(`【${g.vendor || '未指定廠商'}】`);
     g.items.forEach(it => lines.push(`${++n}. ${it.drug}　需要 ${fmtQty(it.orderQty ?? it.qty, it.orderUnit || it.unit)}${it.note ? '，' + it.note : ''}`));
   });
@@ -879,9 +879,9 @@ function progressText(b, vendor) {
   const n = gs.reduce((s, g) => s + g.items.length, 0), now = nowStr();
   const when = now.date === b.date ? `${b.date} ${now.time}` : `${b.date}（${now.date} ${now.time} 更新）`;
   const lines = [];
-  let k = 0;
   const SHORT = { '已訂貨': '已訂', '已調貨': '已調', '缺藥': '缺藥', '其他': '其他' };
   gs.forEach(g => {
+    let k = 0; // 每個廠商重新從 1 開始
     lines.push(`【${g.vendor || '未指定廠商'}】`);
     g.items.forEach(it => {
       if (it.progress === '其他') { // 其他：只放 ❕ + 備2 的文字
