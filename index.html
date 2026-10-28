@@ -204,6 +204,7 @@
   .toast { font-size: 17px; padding: 12px 18px; }
   .adding { margin-top: 14px; text-align: center; font-size: 18px; font-weight: 700; color: var(--accent); }
   button:disabled { opacity: .5; }
+  .ver { font-size: 14px; font-weight: 600; color: var(--muted); margin-left: 8px; }
   /* 清楚好讀的新增視窗 */
   .wiz-date { font-size: 16px; font-weight: 500; color: var(--muted); margin-left: 6px; }
   .wiz-drug { font-size: 22px; font-weight: 700; color: var(--drug); margin: 6px 0 12px; word-break: break-word; }
@@ -319,6 +320,20 @@
   .side-group .item:first-child { border-top: 0; }
   .block.is-gen .vcard-title { padding: 8px 10px; background: var(--surface2); color: var(--ink); }
   .vt-name small { font-size: 15px; opacity: 1; color: var(--muted); }
+  /* 已生成卡：左側欄放廠商名＋三個按鈕 */
+  .gen-side { width: 64px; flex-direction: column; justify-content: flex-start; gap: 8px; padding: 10px 5px; }
+  .gen-side .vs-name { font-size: 19px; line-height: 1.3; text-align: center; margin-bottom: 4px; }
+  .sbtn { width: 100%; border: 1.5px solid var(--c, var(--line)); color: var(--c, var(--ink)); background: var(--surface);
+    border-radius: 10px; padding: 6px 0; font-size: 14px; font-weight: 700; line-height: 1.25; }
+  .sbtn.line-chip { background: #06C755; border-color: #06C755; color: #fff; }
+  .vcard-title { flex-direction: column; align-items: stretch !important; gap: 6px; }
+  .vcard-title .vt-name { flex-direction: row; justify-content: space-between; align-items: center; }
+  .t-row { display: grid; grid-template-columns: 1fr auto 1fr auto; gap: 6px; align-items: center; }
+  .t-row .f { width: 100%; max-width: none; min-height: 40px; font-size: 16px; background: var(--surface); }
+  .by-lbl { font-size: 13px; color: var(--muted); font-weight: 500; }
+  .t-stack { display: flex; flex-direction: column; gap: 4px; }
+  .t-stack .chipbtn { font-size: 14px; min-height: 34px; padding: 3px 10px; white-space: nowrap; }
+  .block.is-gen .v-foot { padding: 8px 10px; }
   .gen-row { display: grid; grid-template-columns: minmax(64px, 1fr) minmax(64px, 1fr) minmax(104px, 1.5fr); gap: 6px; margin-top: 8px; }
   .gen-row .f { width: 100% !important; max-width: none; }
   .by-r { text-align: right; margin-top: 2px; }
@@ -380,8 +395,10 @@
 <script>
 // API_URL 放在 config.js（這樣更新 index.html 時就不用重填）
 
+const APP_VERSION = '2026-10-29.2'; // 每次更新 index.html 會改這個
 const PROGRESS = ['已訂貨', '已調貨', '缺藥'];
-const SLIP = ['貨單已key', '缺貨單需要電子檔'];
+const SLIP = ['已key', '缺貨單'];
+const slipName = s => ({ '貨單已key': '已key', '缺貨單需要電子檔': '缺貨單' }[s] || s || ''); // 舊資料換成新名稱
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const store = {
@@ -531,24 +548,26 @@ function vendorCardHTML(b, g) {
   const files = (v.files || []).map(f => `<div>📄 <a href="${esc(f.url)}" target="_blank" rel="noopener">${esc(f.name)}</a>
       <span class="by">${esc(f.by || '')}</span><button class="x fdel" data-file="${esc(f.id)}" aria-label="刪除檔案">×</button></div>`).join('');
   return `<section class="block is-gen" data-id="${esc(b.id)}" data-vendor="${esc(g.vendor)}">
-      <div class="v-side"><span>${vtext(g.vendor || '未指定廠商')}</span></div><div class="v-main">
+      <div class="v-side gen-side">
+        <span class="vs-name">${vtext(g.vendor || '未指定廠商')}</span>
+        <button class="sbtn vshare line-chip">進度<br>分享</button>
+        <button class="sbtn vbtn" data-p="已訂貨" style="--c:var(--p-已訂貨)">全部<br>已訂</button>
+        <button class="sbtn vbtn" data-p="已調貨" style="--c:var(--p-已調貨)">全部<br>已調</button>
+      </div><div class="v-main">
       <div class="v-title vcard-title">
-        <div class="vt-name"><small>${g.items.length} 項 · ${esc(b.generatedBy || b.createdBy || '')}</small></div>
-        <div class="v-right">
-          <select class="f slip" aria-label="貨單狀態">${opts(SLIP, v.slip, '貨單')}</select>
+        <div class="vt-name"><small>${g.items.length} 項 · ${esc(b.generatedBy || b.createdBy || '')}</small><button class="icon b-del" aria-label="刪除這個廠商">🗑</button></div>
+        <div class="t-row">
+          <select class="f slip" aria-label="貨單狀態">${opts(SLIP, slipName(v.slip), '貨單')}</select>
+          <span class="by-lbl">by</span>
           <select class="f slipby" aria-label="貨單處理人員">${opts(S.lists.staff, v.slipBy, '人員')}</select>
-          <button class="chipbtn archive">歸檔</button>
-          <button class="icon b-del" aria-label="刪除這個廠商">🗑</button>
+          <div class="t-stack">
+            <button class="chipbtn upload">📎 貨單上傳</button>
+            <button class="chipbtn archive">歸檔</button>
+          </div>
         </div>
       </div>
       ${g.items.map(genItemHTML).join('')}
       <div class="v-foot">
-        <div class="grid2">
-          <button class="chipbtn vshare line-chip">進度分享</button>
-          <button class="chipbtn vbtn" data-p="已訂貨" style="--c:var(--p-已訂貨)">全部已訂</button>
-          <button class="chipbtn vbtn" data-p="已調貨" style="--c:var(--p-已調貨)">全部已調</button>
-          <button class="chipbtn upload">📎 貨單上傳</button>
-        </div>
         ${files ? `<div class="files">${files}</div>` : ''}
         <button class="btn ghost add-item">＋ 新增品項（${esc(g.vendor || '未指定廠商')}）</button>
       </div>
@@ -628,7 +647,7 @@ function renderHistory() {
     return `<section class="block hist-card" data-id="${esc(b.id)}"><div class="vgroup" data-vendor="${esc(g.vendor)}" style="margin:0;border:0;border-radius:0">
         <div class="v-title"><span>📅 ${esc(b.date)}　${esc(g.vendor || '未指定廠商')}</span><button class="chipbtn unarchive">取消歸檔</button></div>
         ${items}
-        <div class="v-foot"><div class="by">貨單：${esc(v.slip || '—')}${v.slipBy ? '（' + esc(v.slipBy) + '）' : ''}　·　歸檔 ${esc(v.archivedBy || '')} ${atStr}</div>
+        <div class="v-foot"><div class="by">貨單：${esc(slipName(v.slip) || '—')}${v.slipBy ? '（' + esc(v.slipBy) + '）' : ''}　·　歸檔 ${esc(v.archivedBy || '')} ${atStr}</div>
         ${files ? `<div class="files">${files}</div>` : ''}</div></div></section>`;
   }).join('');
 }
@@ -925,7 +944,7 @@ function drawSettings(msg) {
     body = `<div class="chips" id="lChips">${(S.lists[setTab] || []).map(v => `<span class="chip">${esc(v)}<button class="rm icon" data-v="${esc(v)}" aria-label="移除">×</button></span>`).join('') || `<span class="note">還沒有${label}</span>`}</div>
       <input class="big" id="lNew" style="margin-top:12px" placeholder="新增${label}，按 Enter" autocomplete="off">`;
   }
-  el.innerHTML = `<h2>設定</h2><div class="tabs">${tabs.map(([k, n]) => `<button data-tab="${k}" class="${k === setTab ? 'on' : ''}">${n}</button>`).join('')}</div>
+  el.innerHTML = `<h2>設定 <span class="ver">版本 ${APP_VERSION}</span></h2><div class="tabs">${tabs.map(([k, n]) => `<button data-tab="${k}" class="${k === setTab ? 'on' : ''}">${n}</button>`).join('')}</div>
     ${body}<div class="actions"><button class="btn" data-close>關閉</button></div>`;
   el.querySelector('.tabs').onclick = e => { const b = e.target.closest('[data-tab]'); if (b) { setTab = b.dataset.tab; drawSettings(); } };
 
