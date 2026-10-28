@@ -354,7 +354,7 @@
 <!-- 分享到 LINE -->
 <div class="sheet" id="shareSheet">
   <h2 id="shareTitle">叫藥清單已生成 🎉</h2>
-  <p class="sub" id="shareSub">分享到 LINE 群組，大家點連結就能直接進來處理。</p>
+  <p class="sub" id="shareSub">分享到 LINE 群組。</p>
   <pre class="share" id="shareText"></pre>
   <div class="actions">
     <a class="btn line" id="lineBtn" target="_blank" rel="noopener" style="text-align:center;text-decoration:none">分享到 LINE</a>
@@ -814,7 +814,6 @@ function shareText(b) {
     lines.push(`【${g.vendor || '未指定廠商'}】`);
     g.items.forEach(it => lines.push(`${++n}. ${it.drug}　需要 ${fmtQty(it.orderQty ?? it.qty, it.orderUnit || it.unit)}${it.note ? '，' + it.note : ''}`));
   });
-  lines.push(appUrl(b));
   return lines.join('\n');
 }
 const ICON = { '已訂貨': '✅', '已調貨': '🔁', '缺藥': '⚠️' };
@@ -848,7 +847,7 @@ function openShare(b, mode, vendor) {
   const prog = mode === 'progress';
   const text = prog ? progressText(b, vendor) : shareText(b);
   $('shareTitle').textContent = prog ? (vendor === undefined ? '叫貨進度' : `叫貨進度：${vendor || '未指定廠商'}`) : '叫藥清單已生成 🎉';
-  $('shareSub').textContent = prog ? '分享到 LINE 群組，讓大家知道處理到哪了。' : '分享到 LINE 群組，大家點連結就能直接進來處理。';
+  $('shareSub').textContent = prog ? '分享到 LINE 群組，讓大家知道處理到哪了。' : '分享到 LINE 群組。';
   $('shareText').textContent = text;
   $('lineBtn').href = 'https://line.me/R/share?text=' + encodeURIComponent(text);
   $('copyBtn').onclick = async () => {
