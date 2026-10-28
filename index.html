@@ -2,7 +2,7 @@
 <html lang="zh-Hant">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="叫藥調貨">
 <meta name="theme-color" content="#55705F">
@@ -388,6 +388,16 @@
   .t-stack { display: flex; flex-direction: column; gap: 4px; }
   .t-stack .chipbtn { font-size: 14px; min-height: 34px; padding: 3px 10px; white-space: nowrap; }
   .block.is-gen .v-foot { padding: 8px 10px; }
+  .g-note2 { display: none; }
+  .sbtn .u2 { font-size: inherit; font-weight: inherit; }
+  @media (max-width: 640px) { /* 手機：需求｜備1｜備2 同一行、字小一點 */
+    .gen-line .g-ctrls .g-note { display: none; }
+    .gen-line .g-ctrls { grid-template-columns: 1.4fr .9fr 1fr !important; }
+    .gen-line .notes2 { grid-template-columns: auto 1fr 1fr; align-items: center; }
+    .gen-line .g-note2 { display: block; font-size: 12px; line-height: 1.25; color: var(--muted); white-space: nowrap; }
+    .gen-line .notes2 .f { font-size: 13px !important; min-height: 34px; padding: 5px 8px; }
+    .gen-line .gen-side.side2 + .v-main .g-note { display: none; }
+  }
   .notes2 { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; width: 100%; flex-basis: 100%; margin-top: 6px; }
   .notes2 .note-in { margin-top: 0; }
   .notes2 .f { width: 100%; font-size: 16px; font-weight: 500; }
@@ -486,7 +496,7 @@
 <script>
 // API_URL 放在 config.js（這樣更新 index.html 時就不用重填）
 
-const APP_VERSION = '2026-10-29.22'; // 每次更新 index.html 會改這個
+const APP_VERSION = '2026-10-29.25'; // 每次更新 index.html 會改這個
 const PROGRESS = ['已訂貨', '已調貨', '缺藥', '其他'];
 const SLIP = ['已key', '缺貨單'];
 const slipName = s => ({ '貨單已key': '已key', '缺貨單需要電子檔': '缺貨單' }[s] || s || ''); // 舊資料換成新名稱
@@ -699,7 +709,7 @@ function vendorCardHTML(b, g, start = 0) {
   const files = (v.files || []).map(f => `<div>📄 <a href="${esc(f.url)}" target="_blank" rel="noopener">${esc(f.name)}</a>
       <span class="by">${esc(f.by || '')}</span><button class="x fdel" data-file="${esc(f.id)}" aria-label="刪除檔案">×</button></div>`).join('');
   return `<section class="block is-gen" data-id="${esc(b.id)}" data-vendor="${esc(g.vendor)}">
-      <div class="v-side gen-side${g.items.length <= 2 ? ' side2' : ''}">
+      <div class="v-side gen-side${g.items.length <= 1 ? ' side2' : ''}">
         <span class="vs-name">${vtext(g.vendor || '未指定廠商')}</span>
         <button class="sbtn vshare line-chip">進度<br>分享</button>
         <button class="sbtn vbtn" data-p="已訂貨" style="--c:var(--p-已訂貨)">已訂</button>
@@ -774,6 +784,7 @@ function genItemHTML(it, i) {
         <button class="x del" aria-label="刪除品項">×</button>
       </div>
       <div class="notes2">
+        <span class="g-note2">需求${esc(fmtQty(it.qty, it.unit))}${it.progressBy ? `<br>${esc(it.progressBy)}` : ''}</span>
         <input class="f note-in" value="${esc(it.note || '')}" placeholder="備1" aria-label="需求備註" autocomplete="off">
         <input class="f pnote-in" value="${esc(it.progressNote || '')}" placeholder="備2" aria-label="進度備註" autocomplete="off">
       </div>
@@ -951,8 +962,9 @@ $('newBlock').onclick = async () => {
 
 // ======================== 新增品項（一步一步）========================
 let W = null;
-function openWizard(blockId, fixedVendor) { W = { blockId, fixedVendor, step: 'drug', drug: '', vendor: fixedVendor || '', qty: '', unit: '', known: null, edited: false }; showSheet('wiz'); drawWiz(); }
-const fixedV = () => W.fixedVendor !== undefined;
+function openWizard(blockId, fixedVendor) { W = { blockId, fixedVendor, step: 'drug', drug: '', vendor: '', qty: '', unit: '', known: null, edited: false }; showSheet('wiz'); drawWiz(); }
+const fixedV = () => false; // 不再鎖死廠商；卡片的廠商只當預設值
+const cardV = () => W.fixedVendor;
 function nextStep() {
   if (!W.vendor && !fixedV()) W.step = 'vendor';
   else if (W.step === 'vendor' || W.step === 'drug') W.step = 'qty';
@@ -965,9 +977,10 @@ function chooseDrug(name) {
   name = name.trim(); if (!name) return;
   const d = findDrug(name);
   W.drug = name; W.known = d || null;
-  W.vendor = fixedV() ? W.fixedVendor : (d && d.vendor || ''); W.unit = d && d.unit || '';
+  // 從廠商卡按「新增品項」：已知的藥先帶這張卡的廠商；新藥還是會問廠商（這張卡的廠商會先選好）
+  W.vendor = d && d.vendor ? (cardV() !== undefined ? cardV() : d.vendor) : ''; W.unit = d && d.unit || '';
   W.qty = d && d.qty !== null && d.qty !== undefined ? d.qty : '';
-  W.step = (W.vendor || fixedV()) ? 'qty' : 'vendor';
+  W.step = W.vendor ? 'qty' : 'vendor';
   drawWiz();
 }
 function drawWiz() {
@@ -993,7 +1006,7 @@ function drawWiz() {
     return;
   }
   if (W.step === 'vendor' || W.step === 'unit') {
-    const isV = W.step === 'vendor', list = isV ? S.lists.vendors : S.lists.units, cur = isV ? W.vendor : W.unit;
+    const isV = W.step === 'vendor', list = isV ? S.lists.vendors : S.lists.units, cur = isV ? (W.vendor || cardV() || '') : W.unit;
     el.innerHTML = `${head}<label class="lbl">${isV ? '選擇廠商' : '選擇單位'}</label>
       <div class="chips" id="wChips">${list.map(v => `<button class="chip${v === cur ? ' on' : ''}" data-v="${esc(v)}">${esc(v)}</button>`).join('')}</div>
       <input class="big" id="wNew" style="margin-top:12px" placeholder="${isV ? '或輸入新廠商' : '或輸入新單位'}，按 Enter" autocomplete="off">
@@ -1006,7 +1019,7 @@ function drawWiz() {
     return;
   }
   if (W.step === 'qty') {
-    const changed = W.known && (W.unit !== (W.known.unit || '') || (!fixedV() && W.vendor !== (W.known.vendor || '')));
+    const changed = W.known && (W.unit !== (W.known.unit || '') || (W.vendor !== (W.known.vendor || '') && W.vendor !== cardV()));
     el.innerHTML = `${head}
       <div class="summary">
         <button id="wEditV"${fixedV() ? ' disabled' : ''}>${esc(W.vendor || '未指定廠商')}${fixedV() ? '' : ' ✎'}</button>
@@ -1044,7 +1057,7 @@ async function saveWizNow() {
   const j = await run('addItem', { blockId: W.blockId, item, setDefault: !!W.setDefault });
   if (j) {
     toast(`已加入 ${W.drug}`);
-    W = { blockId: W.blockId, fixedVendor: W.fixedVendor, step: 'drug', drug: '', vendor: W.fixedVendor || '', qty: '', unit: '', known: null, edited: false };
+    W = { blockId: W.blockId, fixedVendor: W.fixedVendor, step: 'drug', drug: '', vendor: '', qty: '', unit: '', known: null, edited: false };
     drawWiz(); // 留在視窗，可以繼續加下一項
   } else { W.step = 'qty'; drawWiz(); }
 }
