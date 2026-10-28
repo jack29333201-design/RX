@@ -355,6 +355,21 @@
   select.f.side-sel { width: 100% !important; max-width: none !important; min-height: 34px !important; font-size: 13px !important; padding: 4px 2px !important;
     text-align: center; text-align-last: center; -webkit-appearance: none; appearance: none; background-image: none !important; background-color: var(--surface) !important; }
   .gen-side .by-lbl { font-size: 12px; margin: -4px 0; color: var(--vendor-ink); opacity: .7; }
+  /* 品項少的卡：側欄改兩欄，卡片才不會比內容長 */
+  .gen-side.side2 { width: 104px; display: grid; grid-template-columns: 1fr 1fr; align-content: start; gap: 6px; padding: 10px 6px; }
+  .side2 .vs-name, .side2 .vshare, .side2 .s-sep { grid-column: 1 / -1; }
+  .side2 .vs-name { font-size: 18px; margin: 0; }
+  .side2 .vs-name br { display: none; }
+  .side2 .s-sep { justify-self: center; }
+  .side2 .by-lbl { display: none; }
+  .side2 .sbtn { padding: 5px 0; }
+  .side2 .upload br, .side2 .vshare br, .side2 .u2 { display: none; }
+  .side2 .sbtn { font-size: 13px; }
+  .side2 .upload, .side2 .archive { padding: 5px 0; }
+  @media (max-width: 640px) {
+    .gen-side.side2 + .v-main .g-ctrls { grid-template-columns: 1.3fr .8fr 1fr !important; }
+    .gen-side.side2 + .v-main .g-note { grid-column: 1 / -1; }
+  }
   .foot-row { display: flex; gap: 8px; }
   .foot-row .add-item { flex: 1; }
   .foot-row .del-card { flex: none; width: 56px; padding: 0; font-size: 20px; }
@@ -469,7 +484,7 @@
 <script>
 // API_URL 放在 config.js（這樣更新 index.html 時就不用重填）
 
-const APP_VERSION = '2026-10-29.18'; // 每次更新 index.html 會改這個
+const APP_VERSION = '2026-10-29.20'; // 每次更新 index.html 會改這個
 const PROGRESS = ['已訂貨', '已調貨', '缺藥', '其他'];
 const SLIP = ['已key', '缺貨單'];
 const slipName = s => ({ '貨單已key': '已key', '缺貨單需要電子檔': '缺貨單' }[s] || s || ''); // 舊資料換成新名稱
@@ -637,7 +652,7 @@ function vendorCardHTML(b, g, start = 0) {
   const files = (v.files || []).map(f => `<div>📄 <a href="${esc(f.url)}" target="_blank" rel="noopener">${esc(f.name)}</a>
       <span class="by">${esc(f.by || '')}</span><button class="x fdel" data-file="${esc(f.id)}" aria-label="刪除檔案">×</button></div>`).join('');
   return `<section class="block is-gen" data-id="${esc(b.id)}" data-vendor="${esc(g.vendor)}">
-      <div class="v-side gen-side">
+      <div class="v-side gen-side${g.items.length <= 2 ? ' side2' : ''}">
         <span class="vs-name">${vtext(g.vendor || '未指定廠商')}</span>
         <button class="sbtn vshare line-chip">進度<br>分享</button>
         <button class="sbtn vbtn" data-p="已訂貨" style="--c:var(--p-已訂貨)">已訂</button>
@@ -646,14 +661,14 @@ function vendorCardHTML(b, g, start = 0) {
         <select class="f slip side-sel" aria-label="貨單狀態">${opts(SLIP, slipName(v.slip), '貨單')}</select>
         <span class="by-lbl">by</span>
         <select class="f slipby side-sel" aria-label="貨單處理人員">${opts(S.lists.staff, v.slipBy, '人員')}</select>
-        <button class="sbtn upload">上傳<br>貨單</button>
+        <button class="sbtn upload">上傳<br><span class="u2">貨單</span></button>
         <button class="sbtn archive">歸檔</button>
       </div><div class="v-main">
       ${g.items.map((it, i) => genItemHTML(it, start + i)).join('')}
       <div class="v-foot">
         ${files ? `<div class="files">${files}</div>` : ''}
         <div class="foot-row">
-          <button class="btn ghost add-item">＋ 新增品項（${esc(g.vendor || '未指定廠商')}）</button>
+          <button class="btn ghost add-item">＋ 新增品項</button>
           <button class="btn b-del del-card" aria-label="刪除這個廠商">🗑</button>
         </div>
       </div>
