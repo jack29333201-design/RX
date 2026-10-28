@@ -205,6 +205,9 @@
   .toast { font-size: 17px; padding: 12px 18px; }
   .adding { margin-top: 14px; text-align: center; font-size: 18px; font-weight: 700; color: var(--accent); }
   button:disabled { opacity: .5; }
+  /* 提示文字（placeholder）一律淺灰、細 */
+  :root { --ph: #A3ADAA; } :root[data-theme="dark"] { --ph: #6F86A0; }
+  .big::placeholder, .f::placeholder, input::placeholder { color: var(--ph) !important; font-weight: 400 !important; opacity: 1; }
   .ver { font-size: 14px; font-weight: 600; color: var(--muted); margin-left: 8px; }
   /* 清楚好讀的新增視窗 */
   .wiz-date { font-size: 16px; font-weight: 500; color: var(--muted); margin-left: 6px; }
@@ -407,7 +410,7 @@
 <script>
 // API_URL 放在 config.js（這樣更新 index.html 時就不用重填）
 
-const APP_VERSION = '2026-10-29.5'; // 每次更新 index.html 會改這個
+const APP_VERSION = '2026-10-29.7'; // 每次更新 index.html 會改這個
 const PROGRESS = ['已訂貨', '已調貨', '缺藥', '其他'];
 const SLIP = ['已key', '缺貨單'];
 const slipName = s => ({ '貨單已key': '已key', '缺貨單需要電子檔': '缺貨單' }[s] || s || ''); // 舊資料換成新名稱
@@ -686,7 +689,10 @@ const onListChange = e => {
     const prev = it ? it.progress : '';
     return askText(`「${it ? it.drug : ''}」其他進度`, it && it.progressNote || '', text => {
       t.dataset.p = '其他';
-      run('updateItem', { blockId: c.blockId, itemId: c.itemId, patch: { progress: '其他', progressNote: text } });
+      run('updateItem', { blockId: c.blockId, itemId: c.itemId, patch: { progress: '其他', progressNote: text } }).then(j => {
+        const nb = j && j.block, ni = nb && nb.items.find(x => x.id === c.itemId);
+        if (ni && ni.progress !== '其他') toast('後端還是舊版：請把最新的 Code.gs 部署成「新版本」');
+      });
     }, () => { t.value = prev || ''; t.dataset.sent = t.value; t.dataset.p = prev || ''; });
   }
   for (const cls in patchKey) if (t.classList.contains(cls)) {
@@ -878,6 +884,10 @@ function progressText(b, vendor) {
   gs.forEach(g => {
     lines.push(`【${g.vendor || '未指定廠商'}】`);
     g.items.forEach(it => {
+      if (it.progress === '其他') { // 其他：只放 ❕ + 備2 的文字
+        lines.push(`${++k}. ${it.drug}　❕${it.progressNote || '其他'}`);
+        return;
+      }
       const st = it.progress ? ICON[it.progress] + ' ' + SHORT[it.progress] : '⏳ 未處理';
       const qty = it.progress === '缺藥' ? '' : ' ' + fmtQty(it.orderQty ?? it.qty, it.orderUnit || it.unit);
       lines.push(`${++k}. ${it.drug}　${st}${qty}${it.progressNote ? '，' + it.progressNote : ''}`);
