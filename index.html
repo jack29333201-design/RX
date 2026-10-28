@@ -410,7 +410,7 @@
 <script>
 // API_URL 放在 config.js（這樣更新 index.html 時就不用重填）
 
-const APP_VERSION = '2026-10-29.8'; // 每次更新 index.html 會改這個
+const APP_VERSION = '2026-10-29.9'; // 每次更新 index.html 會改這個
 const PROGRESS = ['已訂貨', '已調貨', '缺藥', '其他'];
 const SLIP = ['已key', '缺貨單'];
 const slipName = s => ({ '貨單已key': '已key', '缺貨單需要電子檔': '缺貨單' }[s] || s || ''); // 舊資料換成新名稱
@@ -501,6 +501,18 @@ let view = 'main'; // main | history
 const isArch = (b, vendor) => !!((b.vendors || {})[vendor || ''] || {}).archived;
 const liveGroups = b => groups(b).filter(g => b.status !== 'generated' || !isArch(b, g.vendor));
 const onMain = b => b.status !== 'generated' || !b.items.length || liveGroups(b).length > 0;
+// 某一天的廠商卡，順序和畫面一樣（新的在上）
+function dayCards(date) {
+  const out = [];
+  S.blocks.filter(b => b.status === 'generated' && b.date === date && onMain(b)).forEach(b => liveGroups(b).forEach(g => out.push({ b, g })));
+  return out.sort((x, y) => (y.b.generatedAt || 0) - (x.b.generatedAt || 0));
+}
+// 這張卡第一個品項的編號前面有幾項（同一天的編號連續）
+function cardStart(b, vendor) {
+  let n = 0;
+  for (const c of dayCards(b.date)) { if (c.b.id === b.id && c.g.vendor === (vendor || '')) return n; n += c.g.items.length; }
+  return 0;
+}
 function render() {
   const el = $('list');
   document.body.classList.toggle('hist', view === 'history');
@@ -521,7 +533,7 @@ function render() {
     const dt = new Date(d + 'T00:00:00'), wk = isNaN(dt) ? '' : `（${W_[dt.getDay()]}）`;
     return `<div class="day" data-date="${esc(d)}"><div class="day-h"><span>📅 <span class="dlong">${esc(d)}</span><span class="dshort">${esc(d.slice(5).replace('-', '/'))}</span>${wk}<small>${cards.length} 家廠商</small></span>
         <span class="day-btns"><button class="day-share"><span class="long">再次生成</span>叫藥清單</button><button class="day-prog">進度分享</button></span></div>
-      ${cards.map(c => vendorCardHTML(c.b, c.g)).join('')}</div>`;
+      ${(() => { let s = 0; return cards.map(c => { const h_ = vendorCardHTML(c.b, c.g, s); s += c.g.items.length; return h_; }).join(''); })()}</div>`;
   }).join('');
   el.innerHTML = drafts.map(blockHTML).join('') + dayHTML;
 }
@@ -558,7 +570,7 @@ function blockHTML(b) {
 // 已生成：每個廠商一張獨立的卡
 // 直排：一個中文字一行，英文數字連在一起
 const vtext = s => (String(s).match(/[A-Za-z0-9.\-]+|\S/gu) || []).map(esc).join('<br>');
-function vendorCardHTML(b, g) {
+function vendorCardHTML(b, g, start = 0) {
   const v = (b.vendors || {})[g.vendor] || {};
   const files = (v.files || []).map(f => `<div>📄 <a href="${esc(f.url)}" target="_blank" rel="noopener">${esc(f.name)}</a>
       <span class="by">${esc(f.by || '')}</span><button class="x fdel" data-file="${esc(f.id)}" aria-label="刪除檔案">×</button></div>`).join('');
@@ -581,7 +593,7 @@ function vendorCardHTML(b, g) {
           </div>
         </div>
       </div>
-      ${g.items.map((it, i) => genItemHTML(it, i)).join('')}
+      ${g.items.map((it, i) => genItemHTML(it, start + i)).join('')}
       <div class="v-foot">
         ${files ? `<div class="files">${files}</div>` : ''}
         <button class="btn ghost add-item">＋ 新增品項（${esc(g.vendor || '未指定廠商')}）</button>
@@ -865,8 +877,8 @@ async function generate(b) {
 function appUrl(b) { return location.origin + location.pathname + '?date=' + encodeURIComponent(b.date) + '&openExternalBrowser=1'; }
 function shareText(b) {
   const lines = [`${String(b.date).slice(5)} 需要調貨`];
+  let n = 0; // 編號跨廠商連續
   groups(b).forEach(g => {
-    let n = 0; // 每個廠商重新從 1 開始
     lines.push(`【${g.vendor || '未指定廠商'}】`);
     g.items.forEach(it => lines.push(`${++n}. ${it.drug}　需要 ${fmtQty(it.orderQty ?? it.qty, it.orderUnit || it.unit)}${it.note ? '，' + it.note : ''}`));
   });
@@ -874,14 +886,14 @@ function shareText(b) {
 }
 const ICON = { '已訂貨': '✅', '已調貨': '☑️', '缺藥': '⚠️', '其他': '❕' };
 function nowStr() { const d = new Date(), p = n => String(n).padStart(2, '0'); return { date: `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`, time: `${p(d.getHours())}:${p(d.getMinutes())}` }; }
-function progressText(b, vendor) {
+function progressText(b, vendor, start = 0) {
   const gs = vendor === undefined ? liveGroups(b) : groups(b).filter(g => g.vendor === vendor);
   const n = gs.reduce((s, g) => s + g.items.length, 0), now = nowStr();
   const when = now.date === b.date ? `${b.date} ${now.time}` : `${b.date}（${now.date} ${now.time} 更新）`;
   const lines = [];
   const SHORT = { '已訂貨': '已訂', '已調貨': '已調', '缺藥': '缺藥', '其他': '其他' };
+  let k = start; // 編號跨廠商連續，和卡片上的編號一樣
   gs.forEach(g => {
-    let k = 0; // 每個廠商重新從 1 開始
     lines.push(`【${g.vendor || '未指定廠商'}】`);
     g.items.forEach(it => {
       if (it.progress === '其他') { // 其他：只放 ❕ + 備2 的文字
@@ -898,14 +910,14 @@ function progressText(b, vendor) {
 // 這一天所有（未歸檔）廠商卡 → 一份叫藥清單
 function shareDay(date, mode = 'list') {
   const items = [];
-  S.blocks.filter(b => b.status === 'generated' && b.date === date)
-    .forEach(b => liveGroups(b).forEach(g => items.push(...g.items)));
+  dayCards(date).forEach(c => items.push(...c.g.items));
   if (!items.length) return toast('這天沒有可分享的品項');
   openShare({ date, items, vendors: {}, generatedBy: me }, mode);
 }
 function openShare(b, mode, vendor) {
   const prog = mode === 'progress';
-  const text = prog ? progressText(b, vendor) : shareText(b);
+  const start = prog && vendor !== undefined ? cardStart(b, vendor) : 0;
+  const text = prog ? progressText(b, vendor, start) : shareText(b);
   $('shareTitle').textContent = prog ? (vendor === undefined ? '叫貨進度' : `叫貨進度：${vendor || '未指定廠商'}`) : '叫藥清單已生成 🎉';
   $('shareSub').textContent = prog ? '分享到 LINE 群組，讓大家知道處理到哪了。' : '分享到 LINE 群組。';
   $('shareText').textContent = text;
