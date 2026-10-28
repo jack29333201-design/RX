@@ -486,7 +486,7 @@
 <script>
 // API_URL 放在 config.js（這樣更新 index.html 時就不用重填）
 
-const APP_VERSION = '2026-10-29.21'; // 每次更新 index.html 會改這個
+const APP_VERSION = '2026-10-29.22'; // 每次更新 index.html 會改這個
 const PROGRESS = ['已訂貨', '已調貨', '缺藥', '其他'];
 const SLIP = ['已key', '缺貨單'];
 const slipName = s => ({ '貨單已key': '已key', '缺貨單需要電子檔': '缺貨單' }[s] || s || ''); // 舊資料換成新名稱
@@ -513,7 +513,7 @@ applyTheme();
 
 // ======================== 連線 ========================
 let pending = 0;
-async function api(action, data = {}, retried) {
+async function api(action, data = {}, retried, opt) {
   pending++; $('saving').classList.add('on');
   try {
     const res = await fetch(API_URL, {
@@ -524,14 +524,14 @@ async function api(action, data = {}, retried) {
     const j = await res.json();
     if (!j.ok && !retried && /BUSY:|鎖定|lock/i.test(j.error || '')) {
       pending--; await new Promise(r => setTimeout(r, 2500)); pending++;
-      return api(action, data, true); // 伺服器忙，自動再試一次
+      return api(action, data, true, opt); // 伺服器忙，自動再試一次
     }
     if (!j.ok) {
       j.error = String(j.error || '').replace(/^BUSY:/, '');
       if (j.code === 'PASS') { openSettings('me', '團隊密碼錯誤，請重新輸入'); }
       throw new Error(j.error || '發生錯誤');
     }
-    applyRes(j);
+    applyRes(j, opt);
     return j;
   } catch (e) {
     if (e instanceof TypeError) e = new Error('連線失敗，請檢查網路或 API 網址');
@@ -540,24 +540,69 @@ async function api(action, data = {}, retried) {
     if (--pending <= 0) { pending = 0; $('saving').classList.remove('on'); }
   }
 }
+// 後面還有排隊中的修改時，先不要用伺服器回來的舊資料蓋掉畫面（本機已經是最新）
 function applyRes(j) {
-  if (j.blocks) S.blocks = j.blocks;
+  const later = queued > 1;
   if (j.drugs) S.drugs = j.drugs;
-  if (j.lists) S.lists = j.lists;
-  if (j.posts) { S.posts = j.posts; if (view === 'board') renderBoard(); updateBadge(); }
-  if (j.deleted) S.blocks = S.blocks.filter(b => b.id !== j.deleted);
-  if (j.block) {
-    const i = S.blocks.findIndex(b => b.id === j.block.id);
-    if (i < 0) S.blocks.unshift(j.block);
-    else if ((j.block.updatedAt || 0) >= (S.blocks[i].updatedAt || 0)) S.blocks[i] = j.block; // 舊回應不蓋掉新資料
-    renderBlock(j.block.id);
+  if (j.lists && !later) S.lists = j.lists;
+  if (j.posts && !later) { S.posts = j.posts; updateBadge(); }
+  if (!later) {
+    if (j.blocks) S.blocks = j.blocks;
+    if (j.deleted) S.blocks = S.blocks.filter(b => b.id !== j.deleted);
+    if (j.block) {
+      const i = S.blocks.findIndex(b => b.id === j.block.id);
+      if (i < 0) S.blocks.unshift(j.block); else S.blocks[i] = j.block;
+    }
   }
-  if (j.blocks || j.deleted) render();
+  if (j.block || j.blocks || j.deleted || j.posts) renderSafe();
 }
+
+// ---- 立即更新畫面（樂觀更新），背景依序存檔 ----
+const OPTIMISTIC = { updateItem: 1, vendorProgress: 1, vendorSlip: 1, updateBlock: 1, deleteItem: 1, vendorArchive: 1,
+  deleteVendor: 1, deleteBlock: 1, deleteFile: 1, pinPost: 1, deletePost: 1, saveLists: 1 };
+function optimistic(action, d) {
+  const b = findBlock(d.blockId || d.id);
+  const vend = () => { const k = d.vendor || ''; b.vendors = b.vendors || {}; return b.vendors[k] = b.vendors[k] || { slip: '', slipBy: '', files: [] }; };
+  switch (action) {
+    case 'updateItem': {
+      const it = b && b.items.find(x => x.id === d.itemId); if (!it) break;
+      for (const k in d.patch) {
+        let v = d.patch[k];
+        if (k === 'qty' || k === 'orderQty') v = v === '' || v === null ? null : Number(v);
+        it[k] = v;
+        if (k === 'progress') it.progressBy = v ? me : '';
+      }
+      break;
+    }
+    case 'vendorProgress': if (b) b.items.filter(it => (it.vendor || '') === (d.vendor || '')).forEach(it => { it.progress = d.progress; it.progressBy = me; }); break;
+    case 'vendorSlip': if (b) { const v = vend(); if ('slip' in d) v.slip = d.slip; if ('slipBy' in d) v.slipBy = d.slipBy; } break;
+    case 'updateBlock': if (b && d.date) b.date = d.date; break;
+    case 'deleteItem': if (b) b.items = b.items.filter(x => x.id !== d.itemId); break;
+    case 'vendorArchive': if (b) { const v = vend(); v.archived = !!d.archived; v.archivedAt = d.archived ? Date.now() : null; v.archivedBy = d.archived ? me : ''; } break;
+    case 'deleteVendor': if (b) { b.items = b.items.filter(x => (x.vendor || '') !== (d.vendor || '')); if (!b.items.length) S.blocks = S.blocks.filter(x => x !== b); } break;
+    case 'deleteBlock': S.blocks = S.blocks.filter(x => x.id !== d.id); break;
+    case 'deleteFile': if (b) { const v = vend(); v.files = (v.files || []).filter(f => f.id !== d.fileId); } break;
+    case 'pinPost': { const p = (S.posts || []).find(x => x.id === d.id); if (p) p.pinned = !!d.pinned; break; }
+    case 'deletePost': S.posts = (S.posts || []).filter(x => x.id !== d.id); break;
+    case 'saveLists': Object.assign(S.lists, d.lists); break;
+  }
+}
+let writeQ = Promise.resolve(), queued = 0;
 async function run(action, data, okMsg) {
-  try { const j = await api(action, data); if (okMsg) toast(okMsg); return j; }
-  catch (e) { toast(e.message); load(true); }
+  const opt = !!OPTIMISTIC[action];
+  if (opt) { optimistic(action, data); renderSafe(); if (okMsg) toast(okMsg); }
+  queued++;
+  const job = writeQ.then(() => api(action, data, false, opt)); // 一個接一個送，順序不會亂
+  writeQ = job.catch(() => {});
+  try { const j = await job; if (!opt && okMsg) toast(okMsg); return j; }
+  catch (e) { toast('沒存到：' + e.message); setTimeout(() => load(true), 300); }
+  finally { queued--; }
 }
+
+// 正在打字時不重畫，離開輸入框後再更新
+let needRender = false;
+function typing() { const a = document.activeElement; return !!(a && a.closest && a.closest('#list') && a.matches('input, textarea')); }
+function renderSafe() { if (typing()) { needRender = true; return; } needRender = false; render(); }
 
 // ======================== 畫面 ========================
 const findBlock = id => S.blocks.find(b => b.id === id);
@@ -851,6 +896,7 @@ const onListChange = e => {
   if (t.classList.contains('slipby')) return run('vendorSlip', { blockId: c.blockId, vendor: c.vendor, slipBy: t.value });
 };
 $('list').addEventListener('change', onListChange);
+$('list').addEventListener('focusout', () => setTimeout(() => { if (needRender && !typing()) renderSafe(); }, 0));
 $('list').addEventListener('input', onListChange);
 $('list').addEventListener('focusin', e => { if (e.target.tagName === 'SELECT') e.target.dataset.sent = e.target.value; });
 $('list').addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.matches('input.f')) e.target.blur(); });
@@ -1233,6 +1279,7 @@ let firstLoad = true;
 async function load(quiet) {
   if (typeof API_URL === 'undefined' || !API_URL.startsWith('https://')) { $('list').innerHTML = '<div class="empty">請先在 config.js 填入 API_URL（並和 index.html 放在同一個資料夾）</div>'; return false; }
   if (!me || !pass) { if (!quiet) openSettings('me', '先設定名字和團隊密碼'); return false; }
+  if (queued > 0) { setTimeout(() => load(true), 1500); return true; } // 還有修改在存，等一下再抓
   const btn = $('refresh'); btn.classList.add('spin');
   try {
     await api('init');
