@@ -411,7 +411,7 @@
 <script>
 // API_URL 放在 config.js（這樣更新 index.html 時就不用重填）
 
-const APP_VERSION = '2026-10-29.10'; // 每次更新 index.html 會改這個
+const APP_VERSION = '2026-10-29.11'; // 每次更新 index.html 會改這個
 const PROGRESS = ['已訂貨', '已調貨', '缺藥', '其他'];
 const SLIP = ['已key', '缺貨單'];
 const slipName = s => ({ '貨單已key': '已key', '缺貨單需要電子檔': '缺貨單' }[s] || s || ''); // 舊資料換成新名稱
@@ -881,7 +881,7 @@ function shareText(b) {
   let n = 0; // 編號跨廠商連續
   groups(b).forEach(g => {
     lines.push(`【${g.vendor || '未指定廠商'}】`);
-    g.items.forEach(it => lines.push(`${++n}. ${it.drug}　需要 ${fmtQty(it.orderQty ?? it.qty, it.orderUnit || it.unit)}${it.note ? '，' + it.note : ''}`));
+    g.items.forEach(it => lines.push(`${++n}. ${it.drug}　需要 ${fmtQty(it.orderQty ?? it.qty, it.orderUnit || it.unit)}${it.note ? '（' + it.note + '）' : ''}`));
   });
   return lines.join('\n');
 }
@@ -898,12 +898,12 @@ function progressText(b, vendor, start = 0) {
     lines.push(`【${g.vendor || '未指定廠商'}】`);
     g.items.forEach(it => {
       if (it.progress === '其他') { // 其他：只放 ❕ + 備2 的文字
-        lines.push(`${++k}. ${it.drug}　❕${it.progressNote || '其他'}`);
+        lines.push(`${++k}. ${it.drug}　❕${it.progressNote ? '（' + it.progressNote + '）' : '其他'}`);
         return;
       }
       const st = it.progress ? ICON[it.progress] + ' ' + SHORT[it.progress] : '⏳ 未處理';
       const qty = it.progress === '缺藥' ? '' : ' ' + fmtQty(it.orderQty ?? it.qty, it.orderUnit || it.unit);
-      lines.push(`${++k}. ${it.drug}　${st}${qty}${it.progressNote ? '，' + it.progressNote : ''}`);
+      lines.push(`${++k}. ${it.drug}　${st}${qty}${it.progressNote ? '（' + it.progressNote + '）' : ''}`);
     });
   });
   return lines.join('\n');
