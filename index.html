@@ -496,7 +496,7 @@
 <script>
 // API_URL 放在 config.js（這樣更新 index.html 時就不用重填）
 
-const APP_VERSION = '2026-10-29.25'; // 每次更新 index.html 會改這個
+const APP_VERSION = '2026-10-29.26'; // 每次更新 index.html 會改這個
 const PROGRESS = ['已訂貨', '已調貨', '缺藥', '其他'];
 const SLIP = ['已key', '缺貨單'];
 const slipName = s => ({ '貨單已key': '已key', '缺貨單需要電子檔': '缺貨單' }[s] || s || ''); // 舊資料換成新名稱
@@ -978,7 +978,7 @@ function chooseDrug(name) {
   const d = findDrug(name);
   W.drug = name; W.known = d || null;
   // 從廠商卡按「新增品項」：已知的藥先帶這張卡的廠商；新藥還是會問廠商（這張卡的廠商會先選好）
-  W.vendor = d && d.vendor ? (cardV() !== undefined ? cardV() : d.vendor) : ''; W.unit = d && d.unit || '';
+  W.vendor = d && d.vendor || ''; W.unit = d && d.unit || ''; // 已知的藥一律先顯示它的預設廠商
   W.qty = d && d.qty !== null && d.qty !== undefined ? d.qty : '';
   W.step = W.vendor ? 'qty' : 'vendor';
   drawWiz();
@@ -1019,7 +1019,7 @@ function drawWiz() {
     return;
   }
   if (W.step === 'qty') {
-    const changed = W.known && (W.unit !== (W.known.unit || '') || (W.vendor !== (W.known.vendor || '') && W.vendor !== cardV()));
+    const changed = W.known && (W.unit !== (W.known.unit || '') || W.vendor !== (W.known.vendor || ''));
     el.innerHTML = `${head}
       <div class="summary">
         <button id="wEditV"${fixedV() ? ' disabled' : ''}>${esc(W.vendor || '未指定廠商')}${fixedV() ? '' : ' ✎'}</button>
