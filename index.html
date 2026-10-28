@@ -21,7 +21,7 @@
     --title: linear-gradient(90deg, #FFFFFF 0%, #E0DAB8 60%, #C7D3BF 100%);
     --vendor: #E0DAB8; --vendor-ink: #314448;
     --danger: #B23B3B;
-    --p-已訂貨: #3F74B5; --p-已調貨: #3F9156; --p-缺藥: #C94F4F;
+    --p-已訂貨: #3F74B5; --p-已調貨: #3F9156; --p-缺藥: #C94F4F; --p-其他: #7A5BB0;
     --card-shadow: 0 1px 2px rgba(20,40,40,.06), 0 4px 14px rgba(20,40,40,.07);
     color-scheme: light;
   }
@@ -34,7 +34,7 @@
     --title: linear-gradient(90deg, #FFFFFF 0%, #B3CDE0 55%, #6497B1 100%);
     --vendor: #03396C; --vendor-ink: #E3EDF5;
     --danger: #FF8A8A;
-    --p-已訂貨: #6FB6FF; --p-已調貨: #5FD08A; --p-缺藥: #FF7A7A;
+    --p-已訂貨: #6FB6FF; --p-已調貨: #5FD08A; --p-缺藥: #FF7A7A; --p-其他: #C9A8FF;
     --card-shadow: none;
     color-scheme: dark;
   }
@@ -108,6 +108,7 @@
   select.prog[data-p="已訂貨"] { color: var(--p-已訂貨); border-color: var(--p-已訂貨); }
   select.prog[data-p="已調貨"] { color: var(--p-已調貨); border-color: var(--p-已調貨); }
   select.prog[data-p="缺藥"] { color: var(--p-缺藥); border-color: var(--p-缺藥); }
+  select.prog[data-p="其他"] { color: var(--p-其他); border-color: var(--p-其他); }
   .v-foot { padding: 10px 12px; background: var(--surface2); border-top: 1px solid var(--line); display: grid; gap: 8px; }
   .row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
   .chipbtn { border: 1.5px solid var(--c, var(--line)); color: var(--c, var(--ink)); background: var(--surface);
@@ -334,6 +335,10 @@
   .t-stack { display: flex; flex-direction: column; gap: 4px; }
   .t-stack .chipbtn { font-size: 14px; min-height: 34px; padding: 3px 10px; white-space: nowrap; }
   .block.is-gen .v-foot { padding: 8px 10px; }
+  .notes2 { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; width: 100%; flex-basis: 100%; margin-top: 6px; }
+  .notes2 .note-in { margin-top: 0; }
+  .notes2 .f { width: 100%; font-size: 16px; font-weight: 500; }
+  .it-no { color: var(--accent); margin-right: 6px; }
   .gen-row { display: grid; grid-template-columns: minmax(64px, 1fr) minmax(64px, 1fr) minmax(104px, 1.5fr); gap: 6px; margin-top: 8px; }
   .gen-row .f { width: 100% !important; max-width: none; }
   .by-r { text-align: right; margin-top: 2px; }
@@ -389,14 +394,21 @@
 <!-- 設定 -->
 <div class="sheet" id="setSheet"></div>
 
+<div class="sheet" id="askSheet">
+  <h2 id="askTitle"></h2>
+  <p class="sub">輸入進度說明（會放進「進度分享」）</p>
+  <input class="big" id="askInput" placeholder="備2" autocomplete="off" enterkeyhint="done">
+  <div class="actions"><button class="btn" id="askNo">取消</button><button class="btn primary" id="askOk">確認</button></div>
+</div>
+
 <div class="toast" id="toast" role="status"></div>
 
 <script src="config.js"></script>
 <script>
 // API_URL 放在 config.js（這樣更新 index.html 時就不用重填）
 
-const APP_VERSION = '2026-10-29.2'; // 每次更新 index.html 會改這個
-const PROGRESS = ['已訂貨', '已調貨', '缺藥'];
+const APP_VERSION = '2026-10-29.5'; // 每次更新 index.html 會改這個
+const PROGRESS = ['已訂貨', '已調貨', '缺藥', '其他'];
 const SLIP = ['已key', '缺貨單'];
 const slipName = s => ({ '貨單已key': '已key', '缺貨單需要電子檔': '缺貨單' }[s] || s || ''); // 舊資料換成新名稱
 const $ = id => document.getElementById(id);
@@ -566,7 +578,7 @@ function vendorCardHTML(b, g) {
           </div>
         </div>
       </div>
-      ${g.items.map(genItemHTML).join('')}
+      ${g.items.map((it, i) => genItemHTML(it, i)).join('')}
       <div class="v-foot">
         ${files ? `<div class="files">${files}</div>` : ''}
         <button class="btn ghost add-item">＋ 新增品項（${esc(g.vendor || '未指定廠商')}）</button>
@@ -612,12 +624,12 @@ function draftItemHTML(it) {
         <select class="f vendor" aria-label="廠商">${opts(S.lists.vendors, it.vendor, '未指定廠商')}</select>
         <button class="x del" aria-label="刪除品項">×</button>
       </div>
-      <input class="f note-in" value="${esc(it.note || '')}" placeholder="備註" aria-label="備註" autocomplete="off">
+      <input class="f note-in" value="${esc(it.note || '')}" placeholder="備1" aria-label="需求備註" autocomplete="off">
     </div>`;
 }
-function genItemHTML(it) {
+function genItemHTML(it, i) {
   return `<div class="item draft-row gen-line" data-item="${esc(it.id)}">
-      <span class="it-drug">${esc(it.drug)}</span><button class="x del head-x" aria-label="刪除品項">×</button>
+      <span class="it-drug">${i !== undefined ? `<span class="it-no">${i + 1}.</span>` : ''}${esc(it.drug)}</span><button class="x del head-x" aria-label="刪除品項">×</button>
       <div class="g-ctrls">
         <select class="f prog" data-p="${esc(it.progress)}" aria-label="處理進度">${opts(PROGRESS, it.progress, '進度')}</select>
         <input class="f oq" type="number" inputmode="decimal" min="0" step="any" value="${it.orderQty ?? ''}" aria-label="叫貨量">
@@ -625,7 +637,10 @@ function genItemHTML(it) {
         <span class="g-note">需求${esc(fmtQty(it.qty, it.unit))}${it.progressBy ? `<br>${esc(it.progressBy)}` : ''}</span>
         <button class="x del" aria-label="刪除品項">×</button>
       </div>
-      <input class="f note-in" value="${esc(it.note || '')}" placeholder="備註" aria-label="備註" autocomplete="off">
+      <div class="notes2">
+        <input class="f note-in" value="${esc(it.note || '')}" placeholder="備1" aria-label="需求備註" autocomplete="off">
+        <input class="f pnote-in" value="${esc(it.progressNote || '')}" placeholder="備2" aria-label="進度備註" autocomplete="off">
+      </div>
     </div>`;
 }
 
@@ -665,7 +680,15 @@ const onListChange = e => {
   if (t.tagName === 'SELECT') { if (t.dataset.sent === t.value) return; t.dataset.sent = t.value; }
   const c = ctx(t);
   if (t.classList.contains('b-date')) return run('updateBlock', { id: c.blockId, date: t.value });
-  const patchKey = { qty: 'qty', unit: 'unit', vendor: 'vendor', prog: 'progress', oq: 'orderQty', ou: 'orderUnit', 'note-in': 'note' };
+  const patchKey = { qty: 'qty', unit: 'unit', vendor: 'vendor', prog: 'progress', oq: 'orderQty', ou: 'orderUnit', 'note-in': 'note', 'pnote-in': 'progressNote' };
+  if (t.classList.contains('prog') && t.value === '其他') {
+    const b = findBlock(c.blockId), it = b && b.items.find(x => x.id === c.itemId);
+    const prev = it ? it.progress : '';
+    return askText(`「${it ? it.drug : ''}」其他進度`, it && it.progressNote || '', text => {
+      t.dataset.p = '其他';
+      run('updateItem', { blockId: c.blockId, itemId: c.itemId, patch: { progress: '其他', progressNote: text } });
+    }, () => { t.value = prev || ''; t.dataset.sent = t.value; t.dataset.p = prev || ''; });
+  }
   for (const cls in patchKey) if (t.classList.contains(cls)) {
     if (cls === 'prog') t.dataset.p = t.value;
     return run('updateItem', { blockId: c.blockId, itemId: c.itemId, patch: { [patchKey[cls]]: t.value } });
@@ -791,8 +814,8 @@ function drawWiz() {
       </div>
       <label class="lbl">數量${W.unit ? '（' + esc(W.unit) + '）' : ''}</label>
       <input class="big" id="wQty" type="number" inputmode="decimal" min="0" step="any" value="${esc(W.qty)}" placeholder="輸入數量" enterkeyhint="done">
-      <label class="lbl" style="display:block;margin-top:12px">備註（選填）</label>
-      <input class="big" id="wNote" value="${esc(W.note || '')}" autocomplete="off" enterkeyhint="done">
+      <label class="lbl" style="display:block;margin-top:12px">需求備註（選填）</label>
+      <input class="big" id="wNote" value="${esc(W.note || '')}" placeholder="備1" autocomplete="off" enterkeyhint="done">
       ${W.known ? `<label class="check"><input type="checkbox" id="wDef" ${changed || W.edited ? 'checked' : ''}> 把這次的廠商／數量／單位設為「${esc(W.drug)}」的預設</label>` : ''}
       <div class="actions"><button class="btn" id="wBack">上一步</button><button class="btn primary" id="wOk">加入</button></div>`;
     const keep = () => { W.qty = $('wQty').value; W.note = $('wNote').value; };
@@ -843,7 +866,7 @@ function shareText(b) {
   });
   return lines.join('\n');
 }
-const ICON = { '已訂貨': '✅', '已調貨': '🔁', '缺藥': '⚠️' };
+const ICON = { '已訂貨': '✅', '已調貨': '☑️', '缺藥': '⚠️', '其他': '❕' };
 function nowStr() { const d = new Date(), p = n => String(n).padStart(2, '0'); return { date: `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`, time: `${p(d.getHours())}:${p(d.getMinutes())}` }; }
 function progressText(b, vendor) {
   const gs = vendor === undefined ? liveGroups(b) : groups(b).filter(g => g.vendor === vendor);
@@ -851,13 +874,13 @@ function progressText(b, vendor) {
   const when = now.date === b.date ? `${b.date} ${now.time}` : `${b.date}（${now.date} ${now.time} 更新）`;
   const lines = [];
   let k = 0;
-  const SHORT = { '已訂貨': '已訂', '已調貨': '已調', '缺藥': '缺藥' };
+  const SHORT = { '已訂貨': '已訂', '已調貨': '已調', '缺藥': '缺藥', '其他': '其他' };
   gs.forEach(g => {
     lines.push(`【${g.vendor || '未指定廠商'}】`);
     g.items.forEach(it => {
       const st = it.progress ? ICON[it.progress] + ' ' + SHORT[it.progress] : '⏳ 未處理';
       const qty = it.progress === '缺藥' ? '' : ' ' + fmtQty(it.orderQty ?? it.qty, it.orderUnit || it.unit);
-      lines.push(`${++k}. ${it.drug}　${st}${qty}`);
+      lines.push(`${++k}. ${it.drug}　${st}${qty}${it.progressNote ? '，' + it.progressNote : ''}`);
     });
   });
   return lines.join('\n');
@@ -883,6 +906,25 @@ function openShare(b, mode, vendor) {
   };
   showSheet('shareSheet');
 }
+
+// ======================== 文字輸入視窗（其他進度）========================
+let askCb = null;
+function askText(title, value, ok, cancel) {
+  $('askTitle').textContent = title; $('askInput').value = value || '';
+  askCb = { ok, cancel };
+  showSheet('askSheet');
+  setTimeout(() => $('askInput').focus(), 60);
+}
+function askDone(confirmed) {
+  const cb = askCb; askCb = null;
+  const v = $('askInput').value.trim();
+  closeSheets();
+  if (!cb) return;
+  if (confirmed) cb.ok(v); else cb.cancel && cb.cancel();
+}
+$('askOk').onclick = () => askDone(true);
+$('askNo').onclick = () => askDone(false);
+$('askInput').onkeydown = e => { if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); askDone(true); } };
 
 // ======================== 貨單上傳 ========================
 let upCtx = null;
@@ -1009,7 +1051,7 @@ function closeSheets(keepOverlay) {
   if (!keepOverlay) $('overlay').classList.remove('open');
   if (!keepOverlay && W) { W = null; }
 }
-$('overlay').onclick = () => closeSheets();
+$('overlay').onclick = () => { if (askCb) return askDone(false); closeSheets(); };
 document.addEventListener('click', e => { if (e.target.closest('[data-close]')) closeSheets(); });
 let toastT;
 function toast(m) { const t = $('toast'); t.textContent = m; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), m.length > 18 ? 4500 : 2400); }
