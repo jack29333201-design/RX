@@ -342,6 +342,7 @@
   .notes2 .note-in { margin-top: 0; }
   .notes2 .f { width: 100%; font-size: 16px; font-weight: 500; }
   .it-no { color: var(--accent); margin-right: 6px; }
+  .drow .dN { flex: 1; font-weight: 700; color: var(--drug); }
   .gen-row { display: grid; grid-template-columns: minmax(64px, 1fr) minmax(64px, 1fr) minmax(104px, 1.5fr); gap: 6px; margin-top: 8px; }
   .gen-row .f { width: 100% !important; max-width: none; }
   .by-r { text-align: right; margin-top: 2px; }
@@ -410,7 +411,7 @@
 <script>
 // API_URL 放在 config.js（這樣更新 index.html 時就不用重填）
 
-const APP_VERSION = '2026-10-29.9'; // 每次更新 index.html 會改這個
+const APP_VERSION = '2026-10-29.10'; // 每次更新 index.html 會改這個
 const PROGRESS = ['已訂貨', '已調貨', '缺藥', '其他'];
 const SLIP = ['已key', '缺貨單'];
 const slipName = s => ({ '貨單已key': '已key', '缺貨單需要電子檔': '缺貨單' }[s] || s || ''); // 舊資料換成新名稱
@@ -1027,7 +1028,7 @@ function drawSettings(msg) {
       const raw = $('dSearch').value.trim();
       const addBtn = raw && !findDrug(raw) ? `<button class="btn ghost dAdd" style="width:100%;margin-bottom:8px">＋ 新增「${esc(raw)}」</button>` : '';
       $('dList').innerHTML = addBtn + list.map(d => `<div class="drow" data-name="${esc(d.name)}">
-          <div class="it-top"><span class="it-drug">${esc(d.name)}</span><button class="x dDel" aria-label="刪除藥品">×</button></div>
+          <div class="it-top"><input class="f dN" value="${esc(d.name)}" aria-label="藥品名稱" autocomplete="off"><button class="x dDel" aria-label="刪除藥品">×</button></div>
           <div class="ctrls">
             <select class="f dV">${opts(S.lists.vendors, d.vendor, '預設廠商')}</select>
             <input class="f dQ" type="number" inputmode="decimal" min="0" step="any" value="${d.qty ?? ''}" placeholder="數量">
@@ -1044,7 +1045,10 @@ function drawSettings(msg) {
     $('dSearch').onkeydown = e => { if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); addDrug(); } };
     $('dList').onchange = e => {
       const row = e.target.closest('.drow'); if (!row) return;
-      run('saveDrug', { drug: { name: row.dataset.name, vendor: row.querySelector('.dV').value, qty: row.querySelector('.dQ').value, unit: row.querySelector('.dU').value } }, '已更新預設');
+      const newName = row.querySelector('.dN').value.trim();
+      if (!newName) { row.querySelector('.dN').value = row.dataset.name; return toast('藥品名稱不能空白'); }
+      run('saveDrug', { oldName: row.dataset.name, drug: { name: newName, vendor: row.querySelector('.dV').value, qty: row.querySelector('.dQ').value, unit: row.querySelector('.dU').value } },
+        newName !== row.dataset.name ? '已改名' : '已更新預設').then(j => { if (j) { row.dataset.name = newName; } else draw(); });
     };
     $('dList').onclick = async e => {
       if (e.target.closest('.dAdd')) return addDrug();
