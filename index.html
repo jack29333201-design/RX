@@ -236,6 +236,9 @@
   /* 提示文字（placeholder）一律淺灰、細 */
   :root { --ph: #A3ADAA; } :root[data-theme="dark"] { --ph: #6F86A0; }
   .big::placeholder, .f::placeholder, input::placeholder { color: var(--ph) !important; font-weight: 400 !important; opacity: 1; }
+  .sheet-x { position: absolute; top: 10px; right: 10px; width: 40px; height: 40px; border-radius: 50%; border: 1px solid var(--line);
+    background: var(--surface2); color: var(--ink); font-size: 24px; line-height: 1; padding: 0; z-index: 2; }
+  .sheet h2 { padding-right: 48px; }
   .ver { font-size: 14px; font-weight: 600; color: var(--muted); margin-left: 8px; }
   /* 清楚好讀的新增視窗 */
   .wiz-date { font-size: 16px; font-weight: 500; color: var(--muted); margin-left: 6px; }
@@ -499,6 +502,7 @@
 
 <!-- 分享到 LINE -->
 <div class="sheet" id="shareSheet">
+  <button class="sheet-x" data-close aria-label="關閉">×</button>
   <h2 id="shareTitle">叫藥清單已生成 🎉</h2>
   <p class="sub" id="shareSub">分享到 LINE 群組。</p>
   <pre class="share" id="shareText"></pre>
@@ -538,7 +542,7 @@
 <script>
 // API_URL 放在 config.js（這樣更新 index.html 時就不用重填）
 
-const APP_VERSION = '2026-10-29.29'; // 每次更新 index.html 會改這個
+const APP_VERSION = '2026-10-29.30'; // 每次更新 index.html 會改這個
 const PROGRESS = ['已訂貨', '已調貨', '缺藥', '其他'];
 const SLIP = ['已key', '缺貨單'];
 const slipName = s => ({ '貨單已key': '已key', '缺貨單需要電子檔': '缺貨單' }[s] || s || ''); // 舊資料換成新名稱
@@ -1070,7 +1074,7 @@ function chooseDrug(name) {
 }
 function drawWiz() {
   const el = $('wiz'), blk = findBlock(W.blockId);
-  const head = `<h2>${fixedV() ? esc(W.fixedVendor || '未指定廠商') + ' 新增' : '新增品項'} <span class="wiz-date">${esc(blk ? blk.date : '')}</span></h2>${W.drug ? `<div class="wiz-drug">${esc(W.drug)}</div>` : ''}`;
+  const head = `<button class="sheet-x" data-close aria-label="關閉">×</button><h2>${fixedV() ? esc(W.fixedVendor || '未指定廠商') + ' 新增' : '新增品項'} <span class="wiz-date">${esc(blk ? blk.date : '')}</span></h2>${W.drug ? `<div class="wiz-drug">${esc(W.drug)}</div>` : ''}`;
   const close = `<div class="actions"><button class="btn" data-close>完成</button></div>`;
   if (W.step === 'drug') {
     el.innerHTML = `${head}
@@ -1292,7 +1296,7 @@ function drawSettings(msg) {
     body = `<div class="chips" id="lChips">${(S.lists[setTab] || []).map(v => `<span class="chip">${esc(v)}<button class="rm icon" data-v="${esc(v)}" aria-label="移除">×</button></span>`).join('') || `<span class="note">還沒有${label}</span>`}</div>
       <input class="big" id="lNew" style="margin-top:12px" placeholder="新增${label}，按 Enter" autocomplete="off">`;
   }
-  el.innerHTML = `<h2>設定 <span class="ver">版本 ${APP_VERSION}</span></h2><div class="tabs">${tabs.map(([k, n]) => `<button data-tab="${k}" class="${k === setTab ? 'on' : ''}">${n}</button>`).join('')}</div>
+  el.innerHTML = `<button class="sheet-x" data-close aria-label="關閉">×</button><h2>設定 <span class="ver">版本 ${APP_VERSION}</span></h2><div class="tabs">${tabs.map(([k, n]) => `<button data-tab="${k}" class="${k === setTab ? 'on' : ''}">${n}</button>`).join('')}</div>
     ${body}<div class="actions"><button class="btn" data-close>關閉</button></div>`;
   el.querySelector('.tabs').onclick = e => { const b = e.target.closest('[data-tab]'); if (b) { setTab = b.dataset.tab; drawSettings(); } };
 
