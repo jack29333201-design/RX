@@ -230,6 +230,8 @@
   .toast { font-size: 17px; padding: 12px 18px; }
   .adding { margin-top: 14px; text-align: center; font-size: 18px; font-weight: 700; color: var(--accent); }
   button:disabled { opacity: .5; }
+  /* 手機鍵盤打開時，彈窗貼在鍵盤上方、可往上長高 */
+  .sheet { bottom: var(--kb, 0px) !important; max-height: calc(var(--vvh, 100vh) - 12px) !important; transition: bottom .15s ease-out; }
   /* 提示文字（placeholder）一律淺灰、細 */
   :root { --ph: #A3ADAA; } :root[data-theme="dark"] { --ph: #6F86A0; }
   .big::placeholder, .f::placeholder, input::placeholder { color: var(--ph) !important; font-weight: 400 !important; opacity: 1; }
@@ -484,7 +486,7 @@
 <script>
 // API_URL 放在 config.js（這樣更新 index.html 時就不用重填）
 
-const APP_VERSION = '2026-10-29.20'; // 每次更新 index.html 會改這個
+const APP_VERSION = '2026-10-29.21'; // 每次更新 index.html 會改這個
 const PROGRESS = ['已訂貨', '已調貨', '缺藥', '其他'];
 const SLIP = ['已key', '缺貨單'];
 const slipName = s => ({ '貨單已key': '已key', '缺貨單需要電子檔': '缺貨單' }[s] || s || ''); // 舊資料換成新名稱
@@ -1202,6 +1204,17 @@ function drawSettings(msg) {
 }
 function showMe() { $('meBtn').textContent = '👤 ' + (me || '設定名字'); }
 function ready() { if (!me || !pass) { openSettings('me', '先設定名字和團隊密碼'); return false; } return true; }
+
+// ======================== 手機鍵盤 ========================
+(function () {
+  const vv = window.visualViewport; if (!vv) return;
+  const fit = () => {
+    const kb = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
+    document.documentElement.style.setProperty('--kb', kb + 'px');
+    document.documentElement.style.setProperty('--vvh', vv.height + 'px');
+  };
+  vv.addEventListener('resize', fit); vv.addEventListener('scroll', fit); fit();
+})();
 
 // ======================== 彈窗 / 提示 ========================
 function showSheet(id) { closeSheets(true); $('overlay').classList.add('open'); $(id).classList.add('open'); }
