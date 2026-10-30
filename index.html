@@ -394,6 +394,9 @@
   .t-stack .chipbtn { font-size: 14px; min-height: 34px; padding: 3px 10px; white-space: nowrap; }
   .block.is-gen .v-foot { padding: 8px 10px; }
   .g-note2 { display: none; }
+  #noteText { resize: none; min-height: 120px; font-size: 18px; font-weight: 500; line-height: 1.5; font-family: inherit; }
+  #noteSheet .sub { font-weight: 700; color: var(--drug); font-size: 17px; }
+  input.note-in[readonly], input.pnote-in[readonly] { cursor: text; }
   /* 複選 */
   .pick-box { display: flex; justify-content: center; padding: 2px 0 6px; cursor: pointer; }
   .side2 .pick-box { grid-column: 1 / -1; }
@@ -579,6 +582,14 @@
 <!-- 設定 -->
 <div class="sheet" id="setSheet"></div>
 
+<div class="sheet" id="noteSheet">
+  <button class="sheet-x" id="noteX" aria-label="關閉">×</button>
+  <h2 id="noteTitle">備註</h2>
+  <p class="sub" id="noteDrug"></p>
+  <textarea class="big" id="noteText" rows="4" placeholder="輸入備註" autocomplete="off"></textarea>
+  <div class="actions"><button class="btn" id="noteClear">清除</button><button class="btn" id="noteNo">取消</button><button class="btn primary" id="noteOk">確認</button></div>
+</div>
+
 <div class="sheet" id="askSheet">
   <h2 id="askTitle"></h2>
   <p class="sub">輸入進度說明（會放進「進度分享」）</p>
@@ -605,7 +616,7 @@
 <script>
 // API_URL 放在 config.js（這樣更新 index.html 時就不用重填）
 
-const APP_VERSION = '2026-10-30.12'; // 每次更新 index.html 會改這個
+const APP_VERSION = '2026-10-30.13'; // 每次更新 index.html 會改這個
 const PROGRESS = ['已訂貨', '已調貨', '缺藥', '其他'];
 const SLIP = ['已key', '缺貨單'];
 const slipName = s => ({ '貨單已key': '已key', '缺貨單需要電子檔': '缺貨單' }[s] || s || ''); // 舊資料換成新名稱
@@ -915,7 +926,7 @@ function draftItemHTML(it) {
         <select class="f vendor" aria-label="廠商">${opts(S.lists.vendors, it.vendor, '未指定廠商')}</select>
         <button class="x del" aria-label="刪除品項">×</button>
       </div>
-      <input class="f note-in" value="${esc(it.note || '')}" placeholder="備1" aria-label="需求備註" autocomplete="off">
+      <input class="f note-in" value="${esc(it.note || '')}" placeholder="備1" aria-label="需求備註" autocomplete="off"${isMobile() ? ' readonly' : ''}>
     </div>`;
 }
 function genItemHTML(it, i) {
@@ -930,8 +941,8 @@ function genItemHTML(it, i) {
       </div>
       <div class="notes2">
         <span class="g-note2">需求${esc(fmtQty(it.qty, it.unit))}${it.progressBy ? `<br>${esc(it.progressBy)}` : ''}</span>
-        <input class="f note-in" value="${esc(it.note || '')}" placeholder="備1" aria-label="需求備註" autocomplete="off">
-        <input class="f pnote-in" value="${esc(it.progressNote || '')}" placeholder="備2" aria-label="進度備註" autocomplete="off">
+        <input class="f note-in" value="${esc(it.note || '')}" placeholder="備1" aria-label="需求備註" autocomplete="off"${isMobile() ? ' readonly' : ''}>
+        <input class="f pnote-in" value="${esc(it.progressNote || '')}" placeholder="備2" aria-label="進度備註" autocomplete="off"${isMobile() ? ' readonly' : ''}>
       </div>
     </div>`;
 }
@@ -1040,7 +1051,36 @@ $('list').addEventListener('click', e => {
   if (nb && nb.closest('#list')) { e.stopPropagation(); bump(nb.parentElement.querySelector('input'), nb.classList.contains('nb-up') ? 1 : -1); return; }
   const inp = e.target.closest('input.num');
   if (inp && isMobile()) openPad(inp, inp.getAttribute('aria-label') || '數量', v => { inp.value = v; inp.dispatchEvent(new Event('change', { bubbles: true })); });
+  // 手機：點備1／備2 → 打開整個螢幕寬的編輯框
+  const nt = e.target.closest('input.note-in, input.pnote-in');
+  if (nt && isMobile() && !selectMode) {
+    const row = nt.closest('.item'), drug = row ? (row.querySelector('.it-drug') || {}).innerText || '' : '';
+    openNote(`${nt.classList.contains('pnote-in') ? '備2 進度備註' : '備1 需求備註'}`, drug.replace(/^\d+\.\s*/, ''), nt.value, v => {
+      if (v === nt.value) return;
+      nt.value = v; nt.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+  }
 }, true);
+
+// ---- 手機備註編輯框 ----
+let noteCb = null;
+function openNote(title, drug, value, ok) {
+  noteCb = ok;
+  $('noteTitle').textContent = title; $('noteDrug').textContent = drug;
+  $('noteText').value = value || '';
+  showSheet('noteSheet');
+  setTimeout(() => { const t = $('noteText'); try { t.focus({ preventScroll: true }); } catch (e) { t.focus(); } t.setSelectionRange(t.value.length, t.value.length); }, 250);
+}
+function noteDone(save) {
+  const cb = noteCb; noteCb = null;
+  const v = $('noteText').value.replace(/\s*\n\s*/g, ' ').trim();
+  closeSheets();
+  if (save && cb) cb(v);
+}
+$('noteOk').onclick = () => noteDone(true);
+$('noteNo').onclick = () => noteDone(false);
+$('noteX').onclick = () => noteDone(false);
+$('noteClear').onclick = () => { $('noteText').value = ''; $('noteText').focus(); };
 let padCb = null, padVal = '';
 function openPad(inp, title, cb) {
   padCb = cb; padVal = String(inp.value || '');
@@ -1602,7 +1642,7 @@ function closeSheets(keepOverlay) {
   if (!keepOverlay) $('overlay').classList.remove('open');
   if (!keepOverlay && W) { W = null; }
 }
-$('overlay').onclick = () => { if (askCb) return askDone(false); closeSheets(); };
+$('overlay').onclick = () => { if (askCb) return askDone(false); if (noteCb) return noteDone(true); closeSheets(); };
 document.addEventListener('click', e => { if (e.target.closest('[data-close]')) closeSheets(); });
 let toastT;
 function toast(m) { const t = $('toast'); t.textContent = m; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), m.length > 18 ? 4500 : 2400); }
