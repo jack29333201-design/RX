@@ -393,6 +393,13 @@
   .t-stack .chipbtn { font-size: 14px; min-height: 34px; padding: 3px 10px; white-space: nowrap; }
   .block.is-gen .v-foot { padding: 8px 10px; }
   .g-note2 { display: none; }
+  /* 拖曳把手 */
+  .drag-h { cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none; color: var(--muted); font-size: 20px; line-height: 1; flex: none; }
+  .it-h { padding: 6px 8px 6px 0; margin-left: -4px; }
+  .card-h { display: block; text-align: center; color: var(--vendor-ink); opacity: .7; padding: 0 0 4px; font-size: 22px; }
+  .side2 .card-h { grid-column: 1 / -1; }
+  .dragging { position: relative; z-index: 30; opacity: .97; background: var(--surface); box-shadow: 0 12px 30px rgba(0,0,0,.28); }
+  body.is-dragging, body.is-dragging * { user-select: none; -webkit-user-select: none; cursor: grabbing !important; }
   /* 手機數字：− / ＋ 和數字鍵盤（電腦版不顯示 − / ＋） */
   .nbox { display: contents; }
   .nb { display: none; }
@@ -542,7 +549,7 @@
 <script>
 // API_URL 放在 config.js（這樣更新 index.html 時就不用重填）
 
-const APP_VERSION = '2026-10-29.30'; // 每次更新 index.html 會改這個
+const APP_VERSION = '2026-10-30.1'; // 每次更新 index.html 會改這個
 const PROGRESS = ['已訂貨', '已調貨', '缺藥', '其他'];
 const SLIP = ['已key', '缺貨單'];
 const slipName = s => ({ '貨單已key': '已key', '缺貨單需要電子檔': '缺貨單' }[s] || s || ''); // 舊資料換成新名稱
@@ -615,7 +622,7 @@ function applyRes(j) {
 
 // ---- 立即更新畫面（樂觀更新），背景依序存檔 ----
 const OPTIMISTIC = { updateItem: 1, vendorProgress: 1, vendorSlip: 1, updateBlock: 1, deleteItem: 1, vendorArchive: 1,
-  deleteVendor: 1, deleteBlock: 1, deleteFile: 1, pinPost: 1, deletePost: 1, saveLists: 1 };
+  deleteVendor: 1, deleteBlock: 1, deleteFile: 1, pinPost: 1, deletePost: 1, saveLists: 1, reorderItems: 1, reorderCards: 1 };
 function optimistic(action, d) {
   const b = findBlock(d.blockId || d.id);
   const vend = () => { const k = d.vendor || ''; b.vendors = b.vendors || {}; return b.vendors[k] = b.vendors[k] || { slip: '', slipBy: '', files: [] }; };
@@ -641,6 +648,18 @@ function optimistic(action, d) {
     case 'pinPost': { const p = (S.posts || []).find(x => x.id === d.id); if (p) p.pinned = !!d.pinned; break; }
     case 'deletePost': S.posts = (S.posts || []).filter(x => x.id !== d.id); break;
     case 'saveLists': Object.assign(S.lists, d.lists); break;
+    case 'reorderItems': if (b) {
+      const mine = x => (x.vendor || '') === (d.vendor || ''), slots = [], byId = {};
+      b.items.forEach((x, i) => { if (mine(x)) { slots.push(i); byId[x.id] = x; } });
+      const ordered = d.ids.map(id => byId[id]).filter(Boolean);
+      b.items.forEach(x => { if (mine(x) && !ordered.includes(x)) ordered.push(x); });
+      slots.forEach((s, k) => { b.items[s] = ordered[k]; });
+    } break;
+    case 'reorderCards': d.cards.forEach((c, i) => {
+      const bb = findBlock(c.blockId); if (!bb) return;
+      bb.vendors = bb.vendors || {}; const k = c.vendor || '';
+      (bb.vendors[k] = bb.vendors[k] || { slip: '', slipBy: '', files: [] }).order = i;
+    }); break;
   }
 }
 let writeQ = Promise.resolve(), queued = 0;
@@ -658,7 +677,7 @@ async function run(action, data, okMsg) {
 // 正在打字時不重畫，離開輸入框後再更新
 let needRender = false;
 function typing() { const a = document.activeElement; return !!(a && a.closest && a.closest('#list') && a.matches('input, textarea')); }
-function renderSafe() { if (typing()) { needRender = true; return; } needRender = false; render(); }
+function renderSafe() { if (typing() || dragging) { needRender = true; return; } needRender = false; render(); }
 
 // ======================== 畫面 ========================
 const findBlock = id => S.blocks.find(b => b.id === id);
@@ -683,7 +702,15 @@ const onMain = b => b.status !== 'generated' || !b.items.length || liveGroups(b)
 function dayCards(date) {
   const out = [];
   S.blocks.filter(b => b.status === 'generated' && b.date === date && onMain(b)).forEach(b => liveGroups(b).forEach(g => out.push({ b, g })));
-  return out.sort((x, y) => (y.b.generatedAt || 0) - (x.b.generatedAt || 0));
+  return out.sort(cmpCards);
+}
+// 有拖曳排過的照 order；沒排過的（新的）放最上面
+function cmpCards(x, y) {
+  const ox = ((x.b.vendors || {})[x.g.vendor || ''] || {}).order, oy = ((y.b.vendors || {})[y.g.vendor || ''] || {}).order;
+  const hx = typeof ox === 'number', hy = typeof oy === 'number';
+  if (hx !== hy) return hx ? 1 : -1;
+  if (hx) return ox - oy;
+  return (y.b.generatedAt || 0) - (x.b.generatedAt || 0);
 }
 // 這張卡第一個品項的編號前面有幾項（同一天的編號連續）
 function cardStart(b, vendor) {
@@ -709,7 +736,7 @@ function render() {
   list.filter(b => b.status === 'generated').forEach(b => liveGroups(b).forEach(g => (days[b.date] = days[b.date] || []).push({ b, g })));
   const W_ = ['日', '一', '二', '三', '四', '五', '六'];
   const dayHTML = Object.keys(days).sort().reverse().map(d => {
-    const cards = days[d].sort((x, y) => (y.b.generatedAt || 0) - (x.b.generatedAt || 0));
+    const cards = days[d].sort(cmpCards);
     const dt = new Date(d + 'T00:00:00'), wk = isNaN(dt) ? '' : `（${W_[dt.getDay()]}）`;
     return `<div class="day" data-date="${esc(d)}"><div class="day-h"><span>📅 <span class="dlong">${esc(d)}</span><span class="dshort">${esc(d.slice(5).replace('-', '/'))}</span>${wk}<small>${cards.length} 家廠商</small></span>
         <span class="day-btns"><button class="day-share"><span class="long">再次生成</span>叫藥清單</button><button class="day-prog">進度分享</button></span></div>
@@ -757,6 +784,7 @@ function vendorCardHTML(b, g, start = 0) {
       <span class="by">${esc(f.by || '')}</span><button class="x fdel" data-file="${esc(f.id)}" aria-label="刪除檔案">×</button></div>`).join('');
   return `<section class="block is-gen" data-id="${esc(b.id)}" data-vendor="${esc(g.vendor)}">
       <div class="v-side gen-side${g.items.length <= (isMobile() ? 1 : 2) ? ' side2' : ''}">
+        <span class="drag-h card-h" aria-label="拖曳排序廠商卡">⠿</span>
         <span class="vs-name">${vtext(g.vendor || '未指定廠商')}</span>
         <button class="sbtn vshare line-chip">進度<br>分享</button>
         <button class="sbtn vbtn" data-p="已訂貨" style="--c:var(--p-已訂貨)">已訂</button>
@@ -822,7 +850,7 @@ function draftItemHTML(it) {
 }
 function genItemHTML(it, i) {
   return `<div class="item draft-row gen-line" data-item="${esc(it.id)}">
-      <span class="it-drug">${i !== undefined ? `<span class="it-no">${i + 1}.</span>` : ''}${esc(it.drug)}</span><button class="x del head-x" aria-label="刪除品項">×</button>
+      <span class="drag-h it-h" aria-label="拖曳排序">⠿</span><span class="it-drug">${i !== undefined ? `<span class="it-no">${i + 1}.</span>` : ''}${esc(it.drug)}</span><button class="x del head-x" aria-label="刪除品項">×</button>
       <div class="g-ctrls">
         <select class="f prog" data-p="${esc(it.progress)}" aria-label="處理進度">${opts(PROGRESS, it.progress, '進度')}</select>
         ${numBox('oq', it.orderQty, '叫貨量')}
@@ -960,6 +988,55 @@ $('pad').addEventListener('click', e => {
   else padVal = (padVal === '0' ? '' : padVal) + v;
   drawPad();
 });
+
+// ======================== 拖曳排序（滑鼠、手指都可以）========================
+let dragging = false;
+document.addEventListener('pointerdown', e => {
+  const h = e.target.closest('.drag-h'); if (!h || !h.closest('#list')) return;
+  const isCard = h.classList.contains('card-h');
+  const sel = isCard ? '.block.is-gen' : '.item.gen-line';
+  const el = h.closest(sel); if (!el) return;
+  const box = el.parentElement;
+  const sibs = () => [...box.children].filter(x => x.matches(sel));
+  if (sibs().length < 2) return;
+  e.preventDefault();
+  dragging = true;
+  const before = sibs().map(x => x.dataset.item || (x.dataset.id + '|' + x.dataset.vendor)).join(',');
+  const grab = e.clientY - el.getBoundingClientRect().top;
+  let ty = 0, lastY = e.clientY, scroller = null;
+  el.classList.add('dragging'); document.body.classList.add('is-dragging');
+  const place = y => {
+    lastY = y;
+    const others = sibs().filter(x => x !== el);
+    let target = null;
+    for (const o of others) { const r = o.getBoundingClientRect(); if (y < r.top + r.height / 2) { target = o; break; } }
+    if (target) { if (el.nextElementSibling !== target) box.insertBefore(el, target); }
+    else { const last = others[others.length - 1]; if (last && last.nextElementSibling !== el) last.after(el); }
+    const natural = el.getBoundingClientRect().top - ty;
+    ty = y - grab - natural;
+    el.style.transform = `translateY(${ty}px)`;
+  };
+  const move = ev => { ev.preventDefault(); place(ev.clientY); };
+  const edge = () => { // 拖到畫面邊緣自動捲動
+    const m = 90; let d = 0;
+    if (lastY < m + 60) d = -12; else if (lastY > innerHeight - m) d = 12;
+    if (d) { scrollBy(0, d); place(lastY); }
+    scroller = requestAnimationFrame(edge);
+  };
+  scroller = requestAnimationFrame(edge);
+  const up = () => {
+    window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); window.removeEventListener('pointercancel', up);
+    cancelAnimationFrame(scroller);
+    el.style.transform = ''; el.classList.remove('dragging'); document.body.classList.remove('is-dragging');
+    dragging = false;
+    const after = sibs().map(x => x.dataset.item || (x.dataset.id + '|' + x.dataset.vendor)).join(',');
+    if (after === before) { if (needRender) renderSafe(); return; }
+    if (isCard) run('reorderCards', { cards: sibs().map(x => ({ blockId: x.dataset.id, vendor: x.dataset.vendor || '' })) });
+    else { const card = el.closest('.block'); run('reorderItems', { blockId: card.dataset.id, vendor: card.dataset.vendor || '', ids: sibs().map(x => x.dataset.item) }); }
+  };
+  window.addEventListener('pointermove', move, { passive: false });
+  window.addEventListener('pointerup', up); window.addEventListener('pointercancel', up);
+}, { passive: false });
 
 // ======================== 列表上的操作 ========================
 const ctx = el => {
@@ -1415,7 +1492,7 @@ $('refresh').onclick = async () => { if (await load()) toast('已重新整理');
 // 自動更新：畫面在前景、沒有在輸入、沒開視窗時，每 40 秒抓一次
 function idle() {
   const a = document.activeElement;
-  return !document.hidden && !document.querySelector('.sheet.open') && !(a && a.closest && a.closest('#list') && a.matches('input,select,textarea'));
+  return !document.hidden && !dragging && !document.querySelector('.sheet.open') && !(a && a.closest && a.closest('#list') && a.matches('input,select,textarea'));
 }
 setInterval(() => { if (idle() && pending === 0) load(true); }, 40000);
 document.addEventListener('visibilitychange', () => { if (!document.hidden && idle()) load(true); });
