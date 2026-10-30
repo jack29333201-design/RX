@@ -394,6 +394,19 @@
   .t-stack .chipbtn { font-size: 14px; min-height: 34px; padding: 3px 10px; white-space: nowrap; }
   .block.is-gen .v-foot { padding: 8px 10px; }
   .g-note2 { display: none; }
+  /* 藥品建議清單：像表格一樣對齊 */
+  .sugg .sg-row { display: grid; grid-template-columns: minmax(0, 1fr) 96px 44px; gap: 10px; align-items: center; }
+  .sg-n { font-weight: 700; color: var(--drug); word-break: break-word; }
+  .sg-v, .sg-u { font-size: 15px; font-weight: 600; color: var(--muted); text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .sg-u { text-align: center; }
+  /* 設定 → 藥品：廠商、單位同一行 */
+  .dgrid { display: grid; grid-template-columns: 1.6fr 1fr; gap: 8px; margin-top: 6px; }
+  .dgrid .f { width: 100%; max-width: none; }
+  @media (min-width: 641px) { /* 電腦：藥名｜廠商｜單位｜× 一行，像表格 */
+    .drow { display: grid; grid-template-columns: minmax(0, 1fr) 170px 96px 40px; gap: 8px; align-items: center; }
+    .drow .it-top, .drow .dgrid { display: contents; }
+    .drow .dN { order: 1; } .drow .dV { order: 2; } .drow .dU { order: 3; } .drow .dDel { order: 4; }
+  }
   #noteText { resize: none; min-height: 120px; font-size: 18px; font-weight: 500; line-height: 1.5; font-family: inherit; }
   #noteSheet .sub { font-weight: 700; color: var(--drug); font-size: 17px; }
   input.note-in[readonly], input.pnote-in[readonly] { cursor: text; }
@@ -616,7 +629,7 @@
 <script>
 // API_URL 放在 config.js（這樣更新 index.html 時就不用重填）
 
-const APP_VERSION = '2026-10-30.13'; // 每次更新 index.html 會改這個
+const APP_VERSION = '2026-10-30.15'; // 每次更新 index.html 會改這個
 const PROGRESS = ['已訂貨', '已調貨', '缺藥', '其他'];
 const SLIP = ['已key', '缺貨單'];
 const slipName = s => ({ '貨單已key': '已key', '缺貨單需要電子檔': '缺貨單' }[s] || s || ''); // 舊資料換成新名稱
@@ -1053,14 +1066,19 @@ $('list').addEventListener('click', e => {
   if (inp && isMobile()) openPad(inp, inp.getAttribute('aria-label') || '數量', v => { inp.value = v; inp.dispatchEvent(new Event('change', { bubbles: true })); });
   // 手機：點備1／備2 → 打開整個螢幕寬的編輯框
   const nt = e.target.closest('input.note-in, input.pnote-in');
-  if (nt && isMobile() && !selectMode) {
-    const row = nt.closest('.item'), drug = row ? (row.querySelector('.it-drug') || {}).innerText || '' : '';
-    openNote(`${nt.classList.contains('pnote-in') ? '備2 進度備註' : '備1 需求備註'}`, drug.replace(/^\d+\.\s*/, ''), nt.value, v => {
-      if (v === nt.value) return;
-      nt.value = v; nt.dispatchEvent(new Event('change', { bubbles: true }));
-    });
-  }
+  if (nt) openNoteFor(nt);
 }, true);
+// iPhone 有時只觸發 focus 不觸發 click → 兩個都接，只開一次
+$('list').addEventListener('focusin', e => { const nt = e.target.closest && e.target.closest('input.note-in, input.pnote-in'); if (nt) openNoteFor(nt); });
+function openNoteFor(nt) {
+  if (!isMobile() || selectMode || noteCb) return;
+  nt.blur();
+  const row = nt.closest('.item'), drug = row ? (row.querySelector('.it-drug') || {}).innerText || '' : '';
+  openNote(`${nt.classList.contains('pnote-in') ? '備2 進度備註' : '備1 需求備註'}`, drug.replace(/^\d+\.\s*/, ''), nt.value, v => {
+    if (v === nt.value) return;
+    nt.value = v; nt.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+}
 
 // ---- 手機備註編輯框 ----
 let noteCb = null;
@@ -1263,7 +1281,8 @@ function chooseDrug(name) {
   W.drug = name; W.known = d || null;
   // 從廠商卡按「新增品項」：已知的藥先帶這張卡的廠商；新藥還是會問廠商（這張卡的廠商會先選好）
   W.vendor = fixedV() ? W.fixedVendor : (d && d.vendor || ''); W.unit = d && d.unit || ''; // 已知的藥先顯示它的預設廠商
-  W.qty = d && d.qty !== null && d.qty !== undefined ? d.qty : '';
+  W.qty = ''; // 數量一律空白開始；上次的數量只當提示
+  W.lastQty = d && d.qty !== null && d.qty !== undefined && d.qty !== '' ? d.qty : '';
   W.step = (W.vendor || fixedV()) ? 'qty' : 'vendor';
   drawWiz();
 }
@@ -1280,7 +1299,7 @@ function drawWiz() {
     const draw = () => {
       const q = inp.value.trim().toLowerCase();
       const list = S.drugs.filter(d => (!fixedV() || (d.vendor || '') === (W.fixedVendor || '')) && (!q || d.name.toLowerCase().includes(q))).slice(0, fixedV() ? 30 : 8);
-      $('wSugg').innerHTML = list.map(d => `<button data-name="${esc(d.name)}">${esc(d.name)}<small>${esc([d.vendor, fmtQty(d.qty, d.unit)].filter(Boolean).join(' · '))}</small></button>`).join('')
+      $('wSugg').innerHTML = list.map(d => `<button class="sg-row" data-name="${esc(d.name)}"><span class="sg-n">${esc(d.name)}</span><span class="sg-v">${esc(d.vendor || '—')}</span><span class="sg-u">${esc(d.unit || '')}</span></button>`).join('')
         + (q && !findDrug(inp.value.trim()) ? `<button data-name="${esc(inp.value.trim())}">＋ 新增「${esc(inp.value.trim())}」</button>` : '');
     };
     inp.oninput = draw;
@@ -1310,13 +1329,13 @@ function drawWiz() {
         <button id="wEditU">${esc(W.unit || '未選單位')} ✎</button>
       </div>
       <label class="lbl">數量${W.unit ? '（' + esc(W.unit) + '）' : ''}</label>
-      <div class="wq-box"><button type="button" class="nb nb-dn wq-dn" aria-label="減 1">−</button><input class="big num" id="wQty" type="number" inputmode="decimal" min="0" step="any" value="${esc(W.qty)}" placeholder="輸入數量" enterkeyhint="done"${isMobile() ? ' readonly' : ''}><button type="button" class="nb nb-up wq-up" aria-label="加 1">＋</button></div>
+      <div class="wq-box"><button type="button" class="nb nb-dn wq-dn" aria-label="減 1">−</button><input class="big num" id="wQty" type="number" inputmode="decimal" min="0" step="any" value="${esc(W.qty)}" placeholder="${W.lastQty !== '' && W.lastQty !== undefined ? `上次進 ${esc(W.lastQty)} ${esc(W.unit || '')}` : '輸入數量'}" enterkeyhint="done"${isMobile() ? ' readonly' : ''}><button type="button" class="nb nb-up wq-up" aria-label="加 1">＋</button></div>
       <label class="lbl" style="display:block;margin-top:12px">需求備註（選填）</label>
       <input class="big" id="wNote" value="${esc(W.note || '')}" placeholder="備1" autocomplete="off" enterkeyhint="done">
-      ${W.known ? `<label class="check"><input type="checkbox" id="wDef" ${changed || W.edited ? 'checked' : ''}> 把這次的廠商／數量／單位設為「${esc(W.drug)}」的預設</label>` : ''}
+      ${W.known ? `<label class="check"><input type="checkbox" id="wDef" ${changed || W.edited ? 'checked' : ''}> 把這次的廠商／單位設為「${esc(W.drug)}」的預設</label>` : ''}
       <div class="actions"><button class="btn" id="wBack">上一步</button><button class="btn primary" id="wOk">加入</button></div>`;
     const keep = () => { W.qty = $('wQty').value; W.note = $('wNote').value; };
-    const go = () => { keep(); W.setDefault = $('wDef') ? $('wDef').checked : true; nextStep(); };
+    const go = () => { keep(); if (String(W.qty).trim() === '') { toast('請輸入數量'); return; } W.setDefault = $('wDef') ? $('wDef').checked : true; nextStep(); };
     $('wQty').onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); go(); } };
     $('wNote').onkeydown = e => { if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); go(); } };
     $('wOk').onclick = go;
@@ -1557,7 +1576,7 @@ function drawSettings(msg) {
   } else if (setTab === 'drugs') {
     body = `<input class="big" id="dSearch" placeholder="搜尋或新增藥品，按 Enter" autocomplete="off" enterkeyhint="done">
       <div id="dList" style="margin-top:10px"></div>
-      <p class="note">輸入新藥名按 Enter 就會加入清單，再設定它的預設廠商、數量、單位（修改後自動儲存）。</p>`;
+      <p class="note">輸入新藥名按 Enter 就會加入清單，再設定它的預設廠商、單位（修改後自動儲存）。</p>`;
   } else {
     const label = { vendors: '廠商', units: '單位', staff: '人員' }[setTab];
     body = `<div class="chips" id="lChips">${(S.lists[setTab] || []).map(v => `<span class="chip">${esc(v)}<button class="rm icon" data-v="${esc(v)}" aria-label="移除">×</button></span>`).join('') || `<span class="note">還沒有${label}</span>`}</div>
@@ -1583,10 +1602,9 @@ function drawSettings(msg) {
       const addBtn = raw && !findDrug(raw) ? `<button class="btn ghost dAdd" style="width:100%;margin-bottom:8px">＋ 新增「${esc(raw)}」</button>` : '';
       $('dList').innerHTML = addBtn + list.map(d => `<div class="drow" data-name="${esc(d.name)}">
           <div class="it-top"><input class="f dN" value="${esc(d.name)}" aria-label="藥品名稱" autocomplete="off"><button class="x dDel" aria-label="刪除藥品">×</button></div>
-          <div class="ctrls">
-            <select class="f dV">${opts(S.lists.vendors, d.vendor, '預設廠商')}</select>
-            <input class="f dQ" type="number" inputmode="decimal" min="0" step="any" value="${d.qty ?? ''}" placeholder="數量">
-            <select class="f dU">${opts(S.lists.units, d.unit, '單位')}</select>
+          <div class="dgrid">
+            <select class="f dV" aria-label="預設廠商">${opts(S.lists.vendors, d.vendor, '預設廠商')}</select>
+            <select class="f dU" aria-label="預設單位">${opts(S.lists.units, d.unit, '單位')}</select>
           </div></div>`).join('') + (list.length || addBtn ? '' : '<p class="note">還沒有藥品，在上面輸入藥名按 Enter 新增</p>');
     };
     const addDrug = async () => {
@@ -1601,7 +1619,7 @@ function drawSettings(msg) {
       const row = e.target.closest('.drow'); if (!row) return;
       const newName = row.querySelector('.dN').value.trim();
       if (!newName) { row.querySelector('.dN').value = row.dataset.name; return toast('藥品名稱不能空白'); }
-      run('saveDrug', { oldName: row.dataset.name, drug: { name: newName, vendor: row.querySelector('.dV').value, qty: row.querySelector('.dQ').value, unit: row.querySelector('.dU').value } },
+      run('saveDrug', { oldName: row.dataset.name, drug: { name: newName, vendor: row.querySelector('.dV').value, unit: row.querySelector('.dU').value } },
         newName !== row.dataset.name ? '已改名' : '已更新預設').then(j => { if (j) { row.dataset.name = newName; } else draw(); });
     };
     $('dList').onclick = async e => {
