@@ -292,6 +292,7 @@
   .v-right .chipbtn { font-size: 15px; min-height: 38px; padding: 4px 12px; }
   body.hist .fab { display: none; }
   .hist-h { margin: 4px 4px 12px; font-size: 20px; color: var(--drug); }
+  .trash-btns { display: flex; gap: 6px; }
   .hist-card .v-title .chipbtn { font-size: 14px; min-height: 36px; padding: 4px 10px; }
   .h-item { display: grid; grid-template-columns: 1fr auto auto; gap: 4px 10px; align-items: baseline; padding: 10px 14px; border-top: 1px solid var(--line); }
   .h-item .by { grid-column: 3; text-align: right; }
@@ -589,7 +590,7 @@
 <script>
 // API_URL 放在 config.js（這樣更新 index.html 時就不用重填）
 
-const APP_VERSION = '2026-10-30.8'; // 每次更新 index.html 會改這個
+const APP_VERSION = '2026-10-30.9'; // 每次更新 index.html 會改這個
 const PROGRESS = ['已訂貨', '已調貨', '缺藥', '其他'];
 const SLIP = ['已key', '缺貨單'];
 const slipName = s => ({ '貨單已key': '已key', '缺貨單需要電子檔': '缺貨單' }[s] || s || ''); // 舊資料換成新名稱
@@ -936,7 +937,7 @@ function renderHistory() {
         <span class="by">${esc(it.progressBy || '')}</span></div>`).join('');
     const files = (v.files || []).map(f => `<div>📄 <a href="${esc(f.url)}" target="_blank" rel="noopener">${esc(f.name)}</a></div>`).join('');
     return `<section class="block hist-card" data-id="${esc(b.id)}"><div class="vgroup" data-vendor="${esc(g.vendor)}" style="margin:0;border:0;border-radius:0">
-        <div class="v-title"><span>📅 ${esc(b.date)}　${esc(g.vendor || '未指定廠商')}</span><button class="chipbtn unarchive">取消歸檔</button></div>
+        <div class="v-title"><span>📅 ${esc(b.date)}　${esc(g.vendor || '未指定廠商')}</span><span class="trash-btns"><button class="chipbtn unarchive">還原</button><button class="chipbtn purge" style="--c:var(--danger)">永久刪除</button></span></div>
         ${items}
         <div class="v-foot"><div class="by">貨單：${esc(slipName(v.slip) || '—')}${v.slipBy ? '（' + esc(v.slipBy) + '）' : ''}　·　歸檔 ${esc(v.archivedBy || '')} ${atStr}</div>
         ${files ? `<div class="files">${files}</div>` : ''}</div></div></section>`;
@@ -1155,10 +1156,15 @@ $('list').addEventListener('click', e => {
       run('vendorArchive', { blockId: c.blockId, vendor: c.vendor, archived: true }, '已歸檔，可到「垃圾桶」查看');
     return;
   }
-  if (t.classList.contains('unarchive')) return run('vendorArchive', { blockId: c.blockId, vendor: c.vendor, archived: false }, '已移回主畫面');
+  if (t.classList.contains('unarchive')) return run('vendorArchive', { blockId: c.blockId, vendor: c.vendor, archived: false }, '已還原');
+  if (t.classList.contains('purge')) {
+    if (confirm(`永久刪除「${c.vendor || '未指定廠商'}」這張卡和裡面全部品項？\n刪除後無法復原。`)) run('deleteVendor', { blockId: c.blockId, vendor: c.vendor || '' }, '已永久刪除');
+    return;
+  }
   if (t.classList.contains('b-del')) {
     if (b.status === 'generated') {
-      if (confirm(`刪除 ${b.date}「${c.vendor || '未指定廠商'}」這張和裡面全部品項？`)) run('deleteVendor', { blockId: b.id, vendor: c.vendor || '' }, '已刪除');
+      // 🗑 → 先丟到垃圾桶（可以還原），真正刪除要在垃圾桶裡做
+      if (confirm(`把 ${b.date}「${c.vendor || '未指定廠商'}」丟到垃圾桶？\n之後可以在「垃圾桶」還原。`)) run('vendorArchive', { blockId: b.id, vendor: c.vendor || '', archived: true }, '已丟到垃圾桶');
     } else if (confirm(`刪除 ${b.date} 這張叫藥單？`)) run('deleteBlock', { id: b.id }, '已刪除叫藥單');
   }
 });
