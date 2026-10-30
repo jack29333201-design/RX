@@ -408,11 +408,18 @@
   body.selecting .selbar { display: flex; }
   body.selecting .day-h { margin-bottom: 76px; } /* 留位置給上方的複選列 */
   /* 複選時：只有勾卡片、全選、訂藥進度分享、取消可以按 */
-  body.selecting header, body.selecting .day-share, body.selecting .day-prog, body.selecting .day-add,
-  body.selecting .block.is-draft, body.selecting .day-h > span:first-child { pointer-events: none; }
   body.selecting header .hrow, body.selecting header .vtabs, body.selecting .day-share, body.selecting .day-prog,
   body.selecting .day-add, body.selecting .block.is-draft { opacity: .35; filter: grayscale(.6); }
-  .day-sel { font-weight: 800 !important; border-width: 2px !important; letter-spacing: .05em; }
+  /* 複選按鈕 */
+  .day-sel { display: inline-flex; align-items: center; gap: 5px; font-weight: 800 !important; letter-spacing: .06em;
+    border: 0 !important; border-radius: 999px; padding: 6px 13px 6px 10px !important; color: var(--accent) !important;
+    background: linear-gradient(180deg, #FFFFFF 0%, #EEF4F0 100%) !important;
+    box-shadow: 0 2px 6px rgba(0,0,0,.18), inset 0 -2px 0 rgba(0,0,0,.06), inset 0 1px 0 #fff;
+    transition: transform .12s ease, box-shadow .12s ease; }
+  .day-sel svg { width: 17px; height: 17px; flex: none; }
+  .day-sel:active { transform: translateY(1px) scale(.97); box-shadow: 0 1px 3px rgba(0,0,0,.2), inset 0 1px 2px rgba(0,0,0,.08); }
+  :root[data-theme="dark"] .day-sel { color: #1A1405 !important; background: linear-gradient(180deg, #F6E3A1 0%, #D4AF37 100%) !important;
+    box-shadow: 0 2px 10px rgba(212,175,55,.35), inset 0 1px 0 rgba(255,255,255,.6), inset 0 -2px 0 rgba(0,0,0,.12); }
   .day-sel.on { display: none; } /* 複選中：取消按鈕在上方的複選列 */
   .sel-cancel { background: #FFFFFF !important; color: #D92D2D !important; border: 2px solid #D92D2D !important; font-weight: 800 !important; font-size: 17px !important; }
   @media (max-width: 480px) {
@@ -435,7 +442,7 @@
   .gen-side .add-item { color: var(--accent); border-color: var(--accent); }
   .gen-side .b-del { font-size: 17px; }
   .day-sel { border: 1.5px solid rgba(255,255,255,.7); background: rgba(255,255,255,.16); color: inherit; border-radius: 999px; padding: 6px 12px; font-size: 15px; font-weight: 700; white-space: nowrap; }
-  @media (max-width: 480px) { .day-sel, .day-share, .day-prog { font-size: 13px !important; padding: 4px 8px !important; } .day-btns { gap: 4px; } .day-h { padding: 7px 8px; gap: 6px; } }
+  @media (max-width: 480px) { .day-share, .day-prog { font-size: 13px !important; padding: 4px 8px !important; } .day-sel { font-size: 13px !important; padding: 4px 10px 4px 8px !important; } .day-sel svg { width: 15px; height: 15px; } .day-btns { gap: 4px; } .day-h { padding: 7px 8px; gap: 6px; } }
   .vtabs button { font-size: 15px; padding: 8px 2px; }
   .vtabs button { white-space: nowrap; overflow: hidden; }
   @media (max-width: 480px) { .vtabs { gap: 4px; } .vtabs button { font-size: 15px; padding: 8px 0; } .vtabs .te { display: none; } }
@@ -598,7 +605,7 @@
 <script>
 // API_URL 放在 config.js（這樣更新 index.html 時就不用重填）
 
-const APP_VERSION = '2026-10-30.10'; // 每次更新 index.html 會改這個
+const APP_VERSION = '2026-10-30.12'; // 每次更新 index.html 會改這個
 const PROGRESS = ['已訂貨', '已調貨', '缺藥', '其他'];
 const SLIP = ['已key', '缺貨單'];
 const slipName = s => ({ '貨單已key': '已key', '缺貨單需要電子檔': '缺貨單' }[s] || s || ''); // 舊資料換成新名稱
@@ -805,7 +812,7 @@ function render() {
     const cards = days[d].sort(cmpCards);
     const dt = new Date(d + 'T00:00:00'), wk = isNaN(dt) ? '' : `（${W_[dt.getDay()]}）`;
     return `<div class="day" data-date="${esc(d)}"><div class="day-h"><span>📅 <span class="dlong">${esc(d)}</span><span class="dshort">${esc(d.slice(5).replace('-', '/'))}</span>${wk}<small>${cards.length} 家廠商</small></span>
-        <span class="day-btns"><button class="day-share"><span class="long">再次生成</span>叫藥清單</button><button class="day-prog">進度分享</button><button class="day-sel${selectMode ? ' on' : ''}">${selectMode ? '✕ 取消' : '複選'}</button></span></div>
+        <span class="day-btns"><button class="day-share"><span class="long">再次生成</span>叫藥清單</button><button class="day-prog">進度分享</button><button class="day-sel${selectMode ? ' on' : ''}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="13" height="13" rx="3.5"/><path d="M6.5 9.5l2.3 2.3 4-4.5"/><path d="M20 8v9.5A2.5 2.5 0 0 1 17.5 20H8"/></svg>複選</button></span></div>
       ${(() => { let s = 0; return cards.map(c => { const h_ = vendorCardHTML(c.b, c.g, s, orders); s += c.g.items.length; return h_; }).join(''); })()}
       ${orders ? '' : '<button class="btn ghost day-add">＋ 新增品項</button>'}</div>`;
   }).join('');
@@ -1396,6 +1403,14 @@ $('list').addEventListener('click', e => {
   updateSel();
 }, true);
 $('selCancel').onclick = () => { selectMode = false; picked.clear(); render(); };
+// 複選中點卡片以外的空白處（或其他按鈕）＝ 取消複選
+document.addEventListener('click', e => {
+  if (!selectMode) return;
+  const t = e.target;
+  if (t.closest('#selBar') || t.closest('.block.is-gen') || t.closest('.sheet') || t.closest('#overlay') || t.closest('.pad')) return;
+  e.preventDefault(); e.stopPropagation();
+  selectMode = false; picked.clear(); render();
+}, true);
 $('selAll').onclick = () => {
   const all = [...document.querySelectorAll('.block.is-gen')];
   const allOn = all.every(c => picked.has(pickKey(c.dataset.id, c.dataset.vendor)));
