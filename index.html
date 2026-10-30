@@ -393,6 +393,19 @@
   .t-stack .chipbtn { font-size: 14px; min-height: 34px; padding: 3px 10px; white-space: nowrap; }
   .block.is-gen .v-foot { padding: 8px 10px; }
   .g-note2 { display: none; }
+  /* 複選 */
+  .pick-box { display: flex; justify-content: center; padding: 2px 0 6px; cursor: pointer; }
+  .side2 .pick-box { grid-column: 1 / -1; }
+  .pick { width: 28px; height: 28px; accent-color: var(--accent); cursor: pointer; margin: 0; }
+  .block.is-gen.picked { box-shadow: 0 0 0 3px var(--accent); }
+  .selbar { position: fixed; left: 16px; right: 16px; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); max-width: 728px; margin: 0 auto;
+    z-index: 4; display: none; align-items: center; gap: 8px; padding: 10px 12px; border-radius: 14px;
+    background: var(--surface); border: 1px solid var(--line); box-shadow: 0 8px 24px rgba(0,0,0,.18); }
+  body.selecting .selbar { display: flex; }
+  body.selecting .fab { display: none; }
+  #selCount { flex: 1; font-weight: 700; color: var(--drug); font-size: 16px; }
+  .selbar .btn { flex: none; padding: 10px 14px; min-height: 44px; font-size: 16px; }
+  .selbar .btn:disabled { opacity: .45; }
   /* 拖曳把手 */
   .drag-h { cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none; color: var(--muted); font-size: 20px; line-height: 1; flex: none; }
   .it-h { padding: 6px 8px 6px 0; margin-left: -4px; }
@@ -482,6 +495,7 @@
   <div class="hrow">
     <h1>叫藥調貨</h1>
     <div class="hbtns">
+      <button class="hbtn" id="selBtn">☑ 複選</button>
       <button class="hbtn" id="meBtn"></button>
       <button class="hbtn" id="setBtn" aria-label="設定"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button>
       <button class="hbtn" id="refresh" aria-label="重新整理"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 4v7h-7"/></svg></button>
@@ -500,6 +514,11 @@
 
 <main id="list"><div class="empty">載入中…</div></main>
 <button class="fab" id="newBlock">＋ 新增叫藥單</button>
+<div class="selbar" id="selBar">
+  <span id="selCount">請勾選廠商卡</span>
+  <button class="btn" id="selAll">全選</button>
+  <button class="btn primary" id="selShare" disabled>訂藥進度分享</button>
+</div>
 <input type="file" id="fileInput" accept="image/*,application/pdf" hidden>
 
 <div class="overlay" id="overlay"></div>
@@ -549,7 +568,7 @@
 <script>
 // API_URL 放在 config.js（這樣更新 index.html 時就不用重填）
 
-const APP_VERSION = '2026-10-30.1'; // 每次更新 index.html 會改這個
+const APP_VERSION = '2026-10-30.2'; // 每次更新 index.html 會改這個
 const PROGRESS = ['已訂貨', '已調貨', '缺藥', '其他'];
 const SLIP = ['已key', '缺貨單'];
 const slipName = s => ({ '貨單已key': '已key', '缺貨單需要電子檔': '缺貨單' }[s] || s || ''); // 舊資料換成新名稱
@@ -724,6 +743,10 @@ function render() {
   document.querySelectorAll('#vtabs button').forEach(b => b.classList.toggle('on', b.dataset.view === view));
   updateBadge();
   if (view === 'history') return renderHistory();
+  document.body.classList.toggle('selecting', selectMode && view === 'main');
+  $('selBtn').hidden = view !== 'main';
+  $('selBtn').textContent = selectMode ? '✕ 取消' : '☑ 複選';
+  updateSel();
   if (view === 'board') return renderBoard();
   const list = S.blocks.filter(onMain);
   if (!list.length) {
@@ -782,8 +805,9 @@ function vendorCardHTML(b, g, start = 0) {
   const v = (b.vendors || {})[g.vendor] || {};
   const files = (v.files || []).map(f => `<div>📄 <a href="${esc(f.url)}" target="_blank" rel="noopener">${esc(f.name)}</a>
       <span class="by">${esc(f.by || '')}</span><button class="x fdel" data-file="${esc(f.id)}" aria-label="刪除檔案">×</button></div>`).join('');
-  return `<section class="block is-gen" data-id="${esc(b.id)}" data-vendor="${esc(g.vendor)}">
+  return `<section class="block is-gen${selectMode && picked.has(pickKey(b.id, g.vendor)) ? ' picked' : ''}" data-id="${esc(b.id)}" data-vendor="${esc(g.vendor)}">
       <div class="v-side gen-side${g.items.length <= (isMobile() ? 1 : 2) ? ' side2' : ''}">
+        ${selectMode ? `<label class="pick-box"><input type="checkbox" class="pick"${picked.has(pickKey(b.id, g.vendor)) ? ' checked' : ''} aria-label="勾選 ${esc(g.vendor || '未指定廠商')}"></label>` : ''}
         <span class="drag-h card-h" aria-label="拖曳排序廠商卡">⠿</span>
         <span class="vs-name">${vtext(g.vendor || '未指定廠商')}</span>
         <button class="sbtn vshare line-chip">進度<br>分享</button>
@@ -1285,6 +1309,54 @@ function openShare(b, mode, vendor) {
   const text = prog ? progressText(b, vendor, start) : shareText(b);
   $('shareTitle').textContent = prog ? (vendor === undefined ? '叫貨進度' : `叫貨進度：${vendor || '未指定廠商'}`) : '叫藥清單已生成 🎉';
   $('shareSub').textContent = prog ? '分享到 LINE 群組，讓大家知道處理到哪了。' : '分享到 LINE 群組。';
+  $('shareText').textContent = text;
+  $('lineBtn').href = 'https://line.me/R/share?text=' + encodeURIComponent(text);
+  $('copyBtn').onclick = async () => {
+    try { await navigator.clipboard.writeText(text); toast('已複製，可以貼到 LINE'); }
+    catch (e) { const r = document.createRange(); r.selectNodeContents($('shareText')); getSelection().removeAllRanges(); getSelection().addRange(r); toast('請長按選取的文字複製'); }
+  };
+  showSheet('shareSheet');
+}
+
+// ======================== 複選分享進度 ========================
+let selectMode = false;
+const picked = new Set();
+const pickKey = (id, vendor) => id + '|' + (vendor || '');
+function updateSel() {
+  const n = picked.size;
+  $('selCount').textContent = n ? `已選 ${n} 家` : '請勾選廠商卡';
+  $('selShare').disabled = !n;
+}
+$('selBtn').onclick = () => { selectMode = !selectMode; picked.clear(); render(); };
+$('list').addEventListener('change', e => {
+  const ck = e.target.closest('.pick'); if (!ck) return;
+  const card = ck.closest('.block'); const k = pickKey(card.dataset.id, card.dataset.vendor);
+  if (ck.checked) picked.add(k); else picked.delete(k);
+  card.classList.toggle('picked', ck.checked); updateSel();
+});
+$('selAll').onclick = () => {
+  const all = [...document.querySelectorAll('.block.is-gen')];
+  const allOn = all.every(c => picked.has(pickKey(c.dataset.id, c.dataset.vendor)));
+  all.forEach(c => { const k = pickKey(c.dataset.id, c.dataset.vendor); if (allOn) picked.delete(k); else picked.add(k); });
+  render();
+};
+$('selShare').onclick = () => {
+  // 照畫面順序（日期新→舊、卡片排序），編號和卡片上一樣
+  const dates = [...new Set([...document.querySelectorAll('.day')].map(d => d.dataset.date))];
+  const parts = [];
+  dates.forEach(date => {
+    const chosen = dayCards(date).filter(c => picked.has(pickKey(c.b.id, c.g.vendor)));
+    if (!chosen.length) return;
+    const lines = chosen.map(c => progressText(c.b, c.g.vendor, cardStart(c.b, c.g.vendor)));
+    parts.push({ date, text: lines.join('\n') });
+  });
+  if (!parts.length) return toast('請先勾選廠商卡');
+  const multiDate = parts.length > 1;
+  const text = parts.map(p => (multiDate ? `${p.date.slice(5)}\n` : '') + p.text).join('\n\n');
+  openTextShare('訂藥進度分享', `已選 ${picked.size} 家，分享到 LINE 群組。`, text);
+};
+function openTextShare(title, sub, text) {
+  $('shareTitle').textContent = title; $('shareSub').textContent = sub;
   $('shareText').textContent = text;
   $('lineBtn').href = 'https://line.me/R/share?text=' + encodeURIComponent(text);
   $('copyBtn').onclick = async () => {
