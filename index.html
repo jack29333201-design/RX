@@ -578,7 +578,7 @@
 <script>
 // API_URL 放在 config.js（這樣更新 index.html 時就不用重填）
 
-const APP_VERSION = '2026-10-30.4'; // 每次更新 index.html 會改這個
+const APP_VERSION = '2026-10-30.5'; // 每次更新 index.html 會改這個
 const PROGRESS = ['已訂貨', '已調貨', '缺藥', '其他'];
 const SLIP = ['已key', '缺貨單'];
 const slipName = s => ({ '貨單已key': '已key', '缺貨單需要電子檔': '缺貨單' }[s] || s || ''); // 舊資料換成新名稱
@@ -989,6 +989,7 @@ $('list').addEventListener('click', e => {
     $('shareText').textContent = `📌 公告\n${p.text}`;
     $('shareTitle').textContent = '分享公告'; $('shareSub').textContent = '分享到 LINE 群組。';
     $('lineBtn').href = 'https://line.me/R/share?text=' + encodeURIComponent(`📌 公告\n${p.text}`);
+    $('lineBtn').onclick = null;
     $('copyBtn').onclick = async () => { try { await navigator.clipboard.writeText(`📌 公告\n${p.text}`); toast('已複製'); } catch (err) { toast('請長按文字複製'); } };
     showSheet('shareSheet');
   }
@@ -1325,6 +1326,7 @@ function shareDay(date, mode = 'list') {
   openShare({ date, items, vendors: {}, generatedBy: me }, mode);
 }
 function openShare(b, mode, vendor) {
+  $('lineBtn').onclick = null;
   const prog = mode === 'progress';
   const start = prog && vendor !== undefined ? cardStart(b, vendor) : 0;
   const text = prog ? progressText(b, vendor, start) : shareText(b);
@@ -1374,14 +1376,15 @@ $('selShare').onclick = () => {
   if (!parts.length) return toast('請先勾選廠商卡');
   const multiDate = parts.length > 1;
   const text = parts.map(p => (multiDate ? `${p.date.slice(5)}\n` : '') + p.text).join('\n\n');
-  openTextShare('訂藥進度分享', `已選 ${picked.size} 家，分享到 LINE 群組。`, text);
+  openTextShare('訂藥進度分享', `已選 ${picked.size} 家，分享到 LINE 群組。`, text, () => { selectMode = false; picked.clear(); render(); });
 };
-function openTextShare(title, sub, text) {
+function openTextShare(title, sub, text, done) {
   $('shareTitle').textContent = title; $('shareSub').textContent = sub;
   $('shareText').textContent = text;
   $('lineBtn').href = 'https://line.me/R/share?text=' + encodeURIComponent(text);
+  $('lineBtn').onclick = () => { if (done) setTimeout(done, 0); }; // 分享後自動取消複選
   $('copyBtn').onclick = async () => {
-    try { await navigator.clipboard.writeText(text); toast('已複製，可以貼到 LINE'); }
+    try { await navigator.clipboard.writeText(text); toast('已複製，可以貼到 LINE'); if (done) done(); }
     catch (e) { const r = document.createRange(); r.selectNodeContents($('shareText')); getSelection().removeAllRanges(); getSelection().addRange(r); toast('請長按選取的文字複製'); }
   };
   showSheet('shareSheet');
