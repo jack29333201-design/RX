@@ -412,8 +412,15 @@
   body.selecting .block.is-draft, body.selecting .day-h > span:first-child { pointer-events: none; }
   body.selecting header .hrow, body.selecting header .vtabs, body.selecting .day-share, body.selecting .day-prog,
   body.selecting .day-add, body.selecting .block.is-draft { opacity: .35; filter: grayscale(.6); }
-  .day-sel.on { background: #FFFFFF !important; color: #D92D2D !important; border: 2px solid #D92D2D !important;
-    font-size: 17px !important; font-weight: 800; padding: 5px 12px !important; pointer-events: auto; }
+  .day-sel { font-weight: 800 !important; border-width: 2px !important; letter-spacing: .05em; }
+  .day-sel.on { display: none; } /* 複選中：取消按鈕在上方的複選列 */
+  .sel-cancel { background: #FFFFFF !important; color: #D92D2D !important; border: 2px solid #D92D2D !important; font-weight: 800 !important; font-size: 17px !important; }
+  @media (max-width: 480px) {
+    .selbar { gap: 6px; padding: 8px; }
+    #selCount { font-size: 14px; }
+    .selbar .btn { padding: 8px 9px !important; font-size: 14px !important; min-height: 42px; }
+    .sel-cancel { font-size: 15px !important; }
+  }
   body.selecting .fab { display: none; }
   #selCount { flex: 1; font-weight: 700; color: var(--drug); font-size: 16px; }
   .selbar .btn { flex: none; padding: 10px 14px; min-height: 44px; font-size: 16px; }
@@ -540,6 +547,7 @@
   <span id="selCount">請勾選廠商卡</span>
   <button class="btn" id="selAll">全選</button>
   <button class="btn primary" id="selShare" disabled>訂藥進度分享</button>
+  <button class="btn sel-cancel" id="selCancel">✕ 取消</button>
 </div>
 <input type="file" id="fileInput" accept="image/*,application/pdf" hidden>
 
@@ -590,7 +598,7 @@
 <script>
 // API_URL 放在 config.js（這樣更新 index.html 時就不用重填）
 
-const APP_VERSION = '2026-10-30.9'; // 每次更新 index.html 會改這個
+const APP_VERSION = '2026-10-30.10'; // 每次更新 index.html 會改這個
 const PROGRESS = ['已訂貨', '已調貨', '缺藥', '其他'];
 const SLIP = ['已key', '缺貨單'];
 const slipName = s => ({ '貨單已key': '已key', '缺貨單需要電子檔': '缺貨單' }[s] || s || ''); // 舊資料換成新名稱
@@ -1387,6 +1395,7 @@ $('list').addEventListener('click', e => {
   const ck = card.querySelector('.pick'); if (ck) ck.checked = on;
   updateSel();
 }, true);
+$('selCancel').onclick = () => { selectMode = false; picked.clear(); render(); };
 $('selAll').onclick = () => {
   const all = [...document.querySelectorAll('.block.is-gen')];
   const allOn = all.every(c => picked.has(pickKey(c.dataset.id, c.dataset.vendor)));
