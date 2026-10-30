@@ -409,8 +409,18 @@
   /* 拖曳把手 */
   .drag-h { cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none; color: var(--muted); font-size: 20px; line-height: 1; flex: none; }
   .it-h { padding: 6px 8px 6px 0; margin-left: -4px; }
-  .card-h { display: block; text-align: center; color: var(--vendor-ink); opacity: .7; padding: 0 0 4px; font-size: 22px; }
-  .side2 .card-h { grid-column: 1 / -1; }
+  .vs-head { display: flex; align-items: center; justify-content: center; gap: 2px; margin-bottom: 2px; }
+  .card-h { color: var(--vendor-ink); opacity: .6; font-size: 18px; padding: 2px 2px 2px 0; }
+  .vs-head .vs-name { margin: 0 !important; }
+  .side2 .vs-head { grid-column: 1 / -1; gap: 6px; }
+  .gen-side .add-item { color: var(--accent); border-color: var(--accent); }
+  .gen-side .b-del { font-size: 17px; }
+  .day-sel { border: 1.5px solid rgba(255,255,255,.7); background: rgba(255,255,255,.16); color: inherit; border-radius: 999px; padding: 6px 12px; font-size: 15px; font-weight: 700; white-space: nowrap; }
+  @media (max-width: 480px) { .day-sel { font-size: 14px; padding: 5px 9px; } .day-btns { gap: 4px; } }
+  .vtabs button { font-size: 15px; padding: 8px 2px; }
+  .vtabs button { white-space: nowrap; overflow: hidden; }
+  @media (max-width: 480px) { .vtabs { gap: 4px; } .vtabs button { font-size: 15px; padding: 8px 0; } .vtabs .te { display: none; } }
+  .te { font-style: normal; }
   .dragging { position: relative; z-index: 30; opacity: .97; background: var(--surface); box-shadow: 0 12px 30px rgba(0,0,0,.28); }
   body.is-dragging, body.is-dragging * { user-select: none; -webkit-user-select: none; cursor: grabbing !important; }
   /* 手機數字：− / ＋ 和數字鍵盤（電腦版不顯示 − / ＋） */
@@ -495,7 +505,6 @@
   <div class="hrow">
     <h1>叫藥調貨</h1>
     <div class="hbtns">
-      <button class="hbtn" id="selBtn">☑ 複選</button>
       <button class="hbtn" id="meBtn"></button>
       <button class="hbtn" id="setBtn" aria-label="設定"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button>
       <button class="hbtn" id="refresh" aria-label="重新整理"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 4v7h-7"/></svg></button>
@@ -506,9 +515,10 @@
     </div>
   </div>
   <nav class="vtabs" id="vtabs">
-    <button data-view="main">💊 叫藥</button>
-    <button data-view="board">📌 公佈欄<span class="bdg" id="boardBadge"></span></button>
-    <button data-view="history">📚 歷史</button>
+    <button data-view="main"><i class="te">💊 </i>叫藥</button>
+    <button data-view="orders"><i class="te">🧾 </i>訂藥歷史</button>
+    <button data-view="board"><i class="te">📌 </i>公佈欄<span class="bdg" id="boardBadge"></span></button>
+    <button data-view="history"><i class="te">🗑 </i>垃圾桶</button>
   </nav>
 </header>
 
@@ -568,7 +578,7 @@
 <script>
 // API_URL 放在 config.js（這樣更新 index.html 時就不用重填）
 
-const APP_VERSION = '2026-10-30.2'; // 每次更新 index.html 會改這個
+const APP_VERSION = '2026-10-30.4'; // 每次更新 index.html 會改這個
 const PROGRESS = ['已訂貨', '已調貨', '缺藥', '其他'];
 const SLIP = ['已key', '缺貨單'];
 const slipName = s => ({ '貨單已key': '已key', '缺貨單需要電子檔': '缺貨單' }[s] || s || ''); // 舊資料換成新名稱
@@ -652,11 +662,11 @@ function optimistic(action, d) {
         let v = d.patch[k];
         if (k === 'qty' || k === 'orderQty') v = v === '' || v === null ? null : Number(v);
         it[k] = v;
-        if (k === 'progress') it.progressBy = v ? me : '';
+        if (k === 'progress') { it.progressBy = v ? me : ''; it.progressAt = v ? Date.now() : null; }
       }
       break;
     }
-    case 'vendorProgress': if (b) b.items.filter(it => (it.vendor || '') === (d.vendor || '')).forEach(it => { it.progress = d.progress; it.progressBy = me; }); break;
+    case 'vendorProgress': if (b) b.items.filter(it => (it.vendor || '') === (d.vendor || '')).forEach(it => { it.progress = d.progress; it.progressBy = me; it.progressAt = Date.now(); }); break;
     case 'vendorSlip': if (b) { const v = vend(); if ('slip' in d) v.slip = d.slip; if ('slipBy' in d) v.slipBy = d.slipBy; } break;
     case 'updateBlock': if (b && d.date) b.date = d.date; break;
     case 'deleteItem': if (b) b.items = b.items.filter(x => x.id !== d.itemId); break;
@@ -713,14 +723,26 @@ function groups(b) {
 const opts = (list, cur, blank) => (blank !== undefined ? `<option value="">${esc(blank)}</option>` : '') +
   [...new Set([...(list || []), ...(cur ? [cur] : [])])].map(v => `<option${v === cur ? ' selected' : ''}>${esc(v)}</option>`).join('');
 
-let view = 'main'; // main | history
+let view = 'main'; // main | orders(訂藥歷史) | board | history(歸檔)
 const isArch = (b, vendor) => !!((b.vendors || {})[vendor || ''] || {}).archived;
 const liveGroups = b => groups(b).filter(g => b.status !== 'generated' || !isArch(b, g.vendor));
-const onMain = b => b.status !== 'generated' || !b.items.length || liveGroups(b).length > 0;
-// 某一天的廠商卡，順序和畫面一樣（新的在上）
+// 全部品項都是「已訂貨／已調貨」，而且最後一次處理是在今天以前（過了午夜）→ 移到訂藥歷史
+const DONE = ['已訂貨', '已調貨'];
+const startOfToday = () => { const d = new Date(); d.setHours(0, 0, 0, 0); return d.getTime(); };
+function isDoneMoved(b, g) {
+  if (b.status !== 'generated' || !g.items.length) return false;
+  if (!g.items.every(it => DONE.includes(it.progress))) return false;
+  const last = Math.max(...g.items.map(it => it.progressAt || b.updatedAt || b.generatedAt || 0));
+  return last < startOfToday();
+}
+const mainGroups = b => liveGroups(b).filter(g => !isDoneMoved(b, g));
+const orderGroups = b => liveGroups(b).filter(g => isDoneMoved(b, g));
+const groupsFor = () => view === 'orders' ? orderGroups : mainGroups;
+const onMain = b => b.status !== 'generated' || !b.items.length || mainGroups(b).length > 0;
+// 某一天的廠商卡（目前這一頁），順序和畫面一樣
 function dayCards(date) {
-  const out = [];
-  S.blocks.filter(b => b.status === 'generated' && b.date === date && onMain(b)).forEach(b => liveGroups(b).forEach(g => out.push({ b, g })));
+  const out = [], gf = groupsFor();
+  S.blocks.filter(b => b.status === 'generated' && b.date === date).forEach(b => gf(b).forEach(g => out.push({ b, g })));
   return out.sort(cmpCards);
 }
 // 有拖曳排過的照 order；沒排過的（新的）放最上面
@@ -743,28 +765,29 @@ function render() {
   document.querySelectorAll('#vtabs button').forEach(b => b.classList.toggle('on', b.dataset.view === view));
   updateBadge();
   if (view === 'history') return renderHistory();
-  document.body.classList.toggle('selecting', selectMode && view === 'main');
-  $('selBtn').hidden = view !== 'main';
-  $('selBtn').textContent = selectMode ? '✕ 取消' : '☑ 複選';
+  document.body.classList.toggle('selecting', selectMode && (view === 'main' || view === 'orders'));
   updateSel();
   if (view === 'board') return renderBoard();
-  const list = S.blocks.filter(onMain);
+  const orders = view === 'orders';
+  const list = orders ? S.blocks.filter(b => b.status === 'generated' && orderGroups(b).length) : S.blocks.filter(onMain);
   if (!list.length) {
-    el.innerHTML = '<div class="empty">目前沒有進行中的叫藥單<br>按下方「＋ 新增叫藥單」開始</div>';
+    el.innerHTML = orders
+      ? '<div class="empty">還沒有訂藥歷史<br>廠商卡全部「已訂貨／已調貨」後，過了午夜會移到這裡</div>'
+      : '<div class="empty">目前沒有進行中的叫藥單<br>按下方「＋ 新增叫藥單」開始</div>';
     return;
   }
   // 草稿在最上面；已生成的廠商卡依「日期」分組，新的日期在上
-  const drafts = list.filter(b => b.status !== 'generated');
-  const days = {};
-  list.filter(b => b.status === 'generated').forEach(b => liveGroups(b).forEach(g => (days[b.date] = days[b.date] || []).push({ b, g })));
+  const drafts = orders ? [] : list.filter(b => b.status !== 'generated');
+  const days = {}, gf = groupsFor();
+  list.filter(b => b.status === 'generated').forEach(b => gf(b).forEach(g => (days[b.date] = days[b.date] || []).push({ b, g })));
   const W_ = ['日', '一', '二', '三', '四', '五', '六'];
   const dayHTML = Object.keys(days).sort().reverse().map(d => {
     const cards = days[d].sort(cmpCards);
     const dt = new Date(d + 'T00:00:00'), wk = isNaN(dt) ? '' : `（${W_[dt.getDay()]}）`;
     return `<div class="day" data-date="${esc(d)}"><div class="day-h"><span>📅 <span class="dlong">${esc(d)}</span><span class="dshort">${esc(d.slice(5).replace('-', '/'))}</span>${wk}<small>${cards.length} 家廠商</small></span>
-        <span class="day-btns"><button class="day-share"><span class="long">再次生成</span>叫藥清單</button><button class="day-prog">進度分享</button></span></div>
-      ${(() => { let s = 0; return cards.map(c => { const h_ = vendorCardHTML(c.b, c.g, s); s += c.g.items.length; return h_; }).join(''); })()}
-      <button class="btn ghost day-add">＋ 新增品項</button></div>`;
+        <span class="day-btns"><button class="day-share"><span class="long">再次生成</span>叫藥清單</button><button class="day-prog">進度分享</button><button class="day-sel">${selectMode ? '✕ 取消' : '複選'}</button></span></div>
+      ${(() => { let s = 0; return cards.map(c => { const h_ = vendorCardHTML(c.b, c.g, s, orders); s += c.g.items.length; return h_; }).join(''); })()}
+      ${orders ? '' : '<button class="btn ghost day-add">＋ 新增品項</button>'}</div>`;
   }).join('');
   el.innerHTML = drafts.map(blockHTML).join('') + dayHTML;
 }
@@ -801,33 +824,29 @@ function blockHTML(b) {
 // 已生成：每個廠商一張獨立的卡
 // 直排：一個中文字一行，英文數字連在一起
 const vtext = s => (String(s).match(/[A-Za-z0-9.\-]+|\S/gu) || []).map(esc).join('<br>');
-function vendorCardHTML(b, g, start = 0) {
+function vendorCardHTML(b, g, start = 0, orders = false) {
   const v = (b.vendors || {})[g.vendor] || {};
   const files = (v.files || []).map(f => `<div>📄 <a href="${esc(f.url)}" target="_blank" rel="noopener">${esc(f.name)}</a>
       <span class="by">${esc(f.by || '')}</span><button class="x fdel" data-file="${esc(f.id)}" aria-label="刪除檔案">×</button></div>`).join('');
   return `<section class="block is-gen${selectMode && picked.has(pickKey(b.id, g.vendor)) ? ' picked' : ''}" data-id="${esc(b.id)}" data-vendor="${esc(g.vendor)}">
       <div class="v-side gen-side${g.items.length <= (isMobile() ? 1 : 2) ? ' side2' : ''}">
         ${selectMode ? `<label class="pick-box"><input type="checkbox" class="pick"${picked.has(pickKey(b.id, g.vendor)) ? ' checked' : ''} aria-label="勾選 ${esc(g.vendor || '未指定廠商')}"></label>` : ''}
-        <span class="drag-h card-h" aria-label="拖曳排序廠商卡">⠿</span>
-        <span class="vs-name">${vtext(g.vendor || '未指定廠商')}</span>
+        <div class="vs-head"><span class="drag-h card-h" aria-label="拖曳排序廠商卡">⠿</span><span class="vs-name">${vtext(g.vendor || '未指定廠商')}</span></div>
         <button class="sbtn vshare line-chip">進度<br>分享</button>
         <button class="sbtn vbtn" data-p="已訂貨" style="--c:var(--p-已訂貨)">已訂</button>
         <button class="sbtn vbtn" data-p="已調貨" style="--c:var(--p-已調貨)">已調</button>
         <span class="s-sep"></span>
-        <select class="f slip side-sel" aria-label="貨單狀態">${opts(SLIP, slipName(v.slip), '貨單')}</select>
+        ${orders ? `<select class="f slip side-sel" aria-label="貨單狀態">${opts(SLIP, slipName(v.slip), '貨單')}</select>
         <span class="by-lbl">by</span>
         <select class="f slipby side-sel" aria-label="貨單處理人員">${opts(S.lists.staff, v.slipBy, '人員')}</select>
         <button class="sbtn upload">上傳<br><span class="u2">貨單</span></button>
         <button class="sbtn archive">歸檔</button>
+        <span class="s-sep"></span>` : ''}
+        <button class="sbtn add-item" data-lock="1" aria-label="${esc(g.vendor || '未指定廠商')} 新增品項">新增<br>＋</button>
+        <button class="sbtn b-del" aria-label="刪除這個廠商">🗑</button>
       </div><div class="v-main">
       ${g.items.map((it, i) => genItemHTML(it, start + i)).join('')}
-      <div class="v-foot">
-        ${files ? `<div class="files">${files}</div>` : ''}
-        <div class="foot-row">
-          <button class="btn ghost add-item" data-lock="1">${esc(g.vendor || '未指定廠商')} 新增 ＋</button>
-          <button class="btn b-del del-card" aria-label="刪除這個廠商">🗑</button>
-        </div>
-      </div>
+      ${files ? `<div class="v-foot"><div class="files">${files}</div></div>` : ''}
     </div></section>`;
 }
 
@@ -896,8 +915,8 @@ function renderHistory() {
   S.blocks.forEach(b => groups(b).forEach(g => { if (b.status === 'generated' && isArch(b, g.vendor)) cards.push({ b, g, v: b.vendors[g.vendor || ''] }); }));
   cards.sort((x, y) => (y.v.archivedAt || 0) - (x.v.archivedAt || 0));
   const el = $('list');
-  if (!cards.length) { el.innerHTML = '<div class="empty">還沒有歸檔的紀錄</div>'; return; }
-  el.innerHTML = `<h2 class="hist-h">📚 叫藥歷史</h2>` + cards.map(({ b, g, v }) => {
+  if (!cards.length) { el.innerHTML = '<div class="empty">垃圾桶是空的</div>'; return; }
+  el.innerHTML = `<h2 class="hist-h">🗑 垃圾桶</h2>` + cards.map(({ b, g, v }) => {
     const at = v.archivedAt ? new Date(v.archivedAt) : null, p = n => String(n).padStart(2, '0');
     const atStr = at ? `${at.getMonth() + 1}/${at.getDate()} ${p(at.getHours())}:${p(at.getMinutes())}` : '';
     const items = g.items.map(it => `<div class="h-item"><span class="it-drug">${esc(it.drug)}</span>
@@ -914,6 +933,7 @@ function renderHistory() {
 }
 $('vtabs').onclick = e => {
   const b = e.target.closest('[data-view]'); if (!b) return;
+  if (view !== b.dataset.view) { selectMode = false; picked.clear(); }
   view = b.dataset.view;
   if (view === 'board') markBoardSeen();
   render(); scrollTo(0, 0);
@@ -1102,6 +1122,7 @@ $('list').addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.m
 $('list').addEventListener('click', e => {
   const t = e.target.closest('button'); if (!t) return;
   if (t.classList.contains('day-share')) return shareDay(t.closest('.day').dataset.date);
+  if (t.classList.contains('day-sel')) { selectMode = !selectMode; picked.clear(); render(); return; }
   if (t.classList.contains('day-add')) { const dc = dayCards(t.closest('.day').dataset.date)[0]; if (dc && ready()) openWizard(dc.b.id); return; }
   if (t.classList.contains('day-prog')) return shareDay(t.closest('.day').dataset.date, 'progress');
   const c = ctx(t), b = findBlock(c.blockId);
@@ -1118,8 +1139,8 @@ $('list').addEventListener('click', e => {
   if (t.classList.contains('share')) return openShare(b, 'progress');
   if (t.classList.contains('vshare')) return openShare(b, 'progress', c.vendor);
   if (t.classList.contains('archive')) {
-    if (confirm(`把「${c.vendor || '未指定廠商'}」歸檔？\n歸檔後會移到「📚 歷史」，可以再取消歸檔。`))
-      run('vendorArchive', { blockId: c.blockId, vendor: c.vendor, archived: true }, '已歸檔，可到「📚 歷史」查看');
+    if (confirm(`把「${c.vendor || '未指定廠商'}」歸檔？\n歸檔後會移到「垃圾桶」，可以再取消歸檔。`))
+      run('vendorArchive', { blockId: c.blockId, vendor: c.vendor, archived: true }, '已歸檔，可到「垃圾桶」查看');
     return;
   }
   if (t.classList.contains('unarchive')) return run('vendorArchive', { blockId: c.blockId, vendor: c.vendor, archived: false }, '已移回主畫面');
@@ -1327,7 +1348,7 @@ function updateSel() {
   $('selCount').textContent = n ? `已選 ${n} 家` : '請勾選廠商卡';
   $('selShare').disabled = !n;
 }
-$('selBtn').onclick = () => { selectMode = !selectMode; picked.clear(); render(); };
+
 $('list').addEventListener('change', e => {
   const ck = e.target.closest('.pick'); if (!ck) return;
   const card = ck.closest('.block'); const k = pickKey(card.dataset.id, card.dataset.vendor);
